@@ -19,13 +19,15 @@ exports.AllUserTransactions = async (req, res) => {
 
 exports.AdminGetAllTransactions = async (req, res) => {
     try {
+        const {limit} = req.query
         const totals = await Admintransaction.findAll({})
         const items = await Admintransaction.findAll({
             include: [{model: User, as: 'trans'}],
             order: [['createdAt', 'DESC']],
-            limit: 50,
+            limit: parseInt(limit),
             offset: 0
         })
+        
 
         return res.json({status: 200, msg: items, total: totals.length})
     } catch (error) {
@@ -33,16 +35,3 @@ exports.AdminGetAllTransactions = async (req, res) => {
     }
 }
 
-exports.filterTransaction = async (req, res) => {
-    try {
-        const {tag, val} = req.params
-        const items = await Admintransaction.findAll({
-            where: {[tag]: val},
-            limit: 50
-        })
-
-        return res.json({status: 200, msg: items})
-    }catch (error) {
-        ServerError(res, error)
-    }
-}
