@@ -23,3 +23,4 @@ app.use('/api/bills', require('./routers/bills'))
 app.use('/api/transactions', require('./routers/transactions'))
 
 server.listen(port, () => console.log(`Server listening on localhost:${port}`))
+// cpanel ftp password = amsly2023-server
