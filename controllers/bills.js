@@ -124,12 +124,12 @@ exports.DataBills = async (req, res) => {
       }
       const date = new Date();
       // const note = `${sub.network} ${pack.title} Purchase Successful to ${mobile},  [You have successfull shared ${pack.title} Data to ${mobile}.]`;
-      const note = `${
+      const note = `${sub.network} ${pack.title} Purchase Successful to ${mobile} - [${
         result.data.message ||
         result.data.msg ||
         result.data.api_response ||
-        result.data.server_message
-      }`;
+        result.data.data.true_response
+      }]`;
 
       const failnote = `Unable to purchase ${sub.network} ${pack.title} data plan to ${mobile}`;
       const txid = `TXID_${otpGenerator.generate(5, {
@@ -140,12 +140,12 @@ exports.DataBills = async (req, res) => {
       })}${date.getTime()}`;
       const errmsg = `Transaction Not Successful`;
       const title = "data purchase";
-      const adminnote = `${
+      const adminnote = `${sub.network} ${pack.title} Purchase Successful to ${mobile} - [${
         result.data.message ||
         result.data.msg ||
         result.data.api_response ||
-        result.data.server_message
-      }`;
+        result.data.data.true_response
+      }]`;
 
       console.log(
         "zoned",
@@ -280,12 +280,12 @@ exports.DataBills = async (req, res) => {
           // result = await axios.post(`https://zoedata.ng/api/v2/datashare/?api_key=6tg7x6CJ1LGKQuuRMTaIGy2MxFKX1oahJNqKZHYyMb8GjkAwGRxUPdPhGTkwV5gtdcwbeWhiKoB5TnqztNV2MbdXXrk3zeWnYEWHQFq2o2GKQdaAwT8moNHfmgEzK7aU&product_code=data_share_1gb&phone=08029706970&callback=https://zoedata.ng/webhook.php`)
           const date = new Date();
           // const note = `${sub.network} ${pack.title} Purchase Successful to ${mobile},  [You have successfull shared ${pack.title} Data to ${mobile}.]`;
-          const note = `${
+          const note = `${sub.network} ${pack.title} Purchase Successful to ${mobile} - [${
             result.data.message ||
             result.data.msg ||
             result.data.api_response ||
-            result.data.server_message
-          }`;
+            result.data.data.true_response
+          }]`;
           const failnote = `Unable to purchase ${sub.network} ${pack.title} data plan to ${mobile}`;
           const txid = `TXID_${otpGenerator.generate(5, {
             digits: true,
@@ -295,12 +295,12 @@ exports.DataBills = async (req, res) => {
           })}${date.getTime()}`;
           const errmsg = `Transaction Not Successful`;
           const title = "data purchase";
-          const adminnote = `${
+          const adminnote = `${sub.network} ${pack.title} Purchase Successful to ${mobile} - [${
             result.data.message ||
             result.data.msg ||
             result.data.api_response ||
-            result.data.server_message
-          }`;
+            result.data.data.true_response
+          }]`;
 
           console.log(
             "zoned",
@@ -556,11 +556,11 @@ exports.AirtimeBill = async (req, res) => {
       }
       const date = new Date();
       // const note = `${pack.title} Purchase Successful to ${mobile},  [You have successfull shared ${pack.title} Airtime to ${mobile}.]`;
-      const note = `${result.data.message ||
+      const note = `${pack.title} Purchase Successful to ${mobile} - [${result.data.message ||
         result.data.msg ||
         result.data.api_response ||
-        result.data.server_message
-        }`;
+        result.data.data.true_response
+        }]`;
       const failnote = `Unable to purchase ${service.network} ${pack.title} airtime plan to ${mobile}`;
       const txid = `TXID_${otpGenerator.generate(5, {
         digits: true,
@@ -570,12 +570,12 @@ exports.AirtimeBill = async (req, res) => {
       })}${date.getTime()}`;
       const errmsg = `Transaction Not Successful`;
       const title = "airtime purchase";
-      const adminnote = `${
+      const adminnote = `${pack.title} Purchase Successful to ${mobile} - [${
         result.data.message ||
         result.data.msg ||
         result.data.api_response ||
-        result.data.server_message
-      }`;
+        result.data.data.true_response
+      }]`;
 
       console.log(
         "zoned",
@@ -689,9 +689,9 @@ exports.AirtimeBill = async (req, res) => {
           }
           const date = new Date();
           // const note = `${pack.title} Purchase Successful to ${mobile},  [You have successfull shared ${pack.title} Airtime to ${mobile}.]`;
-      const note = `${
+      const note = `${pack.title} Purchase Successful to ${mobile} - [${
         result.data.message || result.data.msg || result.data.api_response
-      }`;
+      }]`;
           const failnote = `Unable to purchase ${service.network} ${pack.title} airtime plan to ${mobile}`;
           const txid = `TXID_${otpGenerator.generate(5, {
             digits: true,
@@ -701,9 +701,9 @@ exports.AirtimeBill = async (req, res) => {
           })}${date.getTime()}`;
           const errmsg = `Transaction Not Successful`;
           const title = "airtime purchase";
-          const adminnote = `${
+          const adminnote = `${pack.title} Purchase Successful to ${mobile} - [${
             result.data.message || result.data.msg || result.data.api_response
-          }`;
+          }]`;
 
           console.log(
             "zoned",
@@ -948,9 +948,9 @@ exports.CableBill = async (req, res) => {
       }
       const date = new Date();
       // const note = `${pack.title} Purchase Successful to ${iuc}.`;
-      const note = `${
+      const note = `${pack.title} Purchase Successful to ${iuc}. - [${
         result.data.message || result.data.msg || result.data.api_response
-      }`;
+      }]`;
       const failnote = `Unable to purchase ${service.network} ${pack.title} cable plan to ${iuc}`;
       const txid = `TXID_${otpGenerator.generate(5, {
         digits: true,
@@ -960,9 +960,9 @@ exports.CableBill = async (req, res) => {
       })}${date.getTime()}`;
       const errmsg = `Transaction Not Successful`;
       const title = "cable purchase";
-      const adminnote = `${
+      const adminnote = `${pack.title} Purchase Successful to ${iuc}. - [${
         result.data.message || result.data.msg || result.data.api_response
-      }`;
+      }]`;
 
       console.log(
         "zoned",
@@ -1084,9 +1084,9 @@ exports.CableBill = async (req, res) => {
           }
           const date = new Date();
           // const note = `${pack.title} Purchase Successful to ${iuc}.`;
-          const note = `${
+          const note = `${pack.title} Purchase Successful to ${iuc}. - [${
             result.data.message || result.data.msg || result.data.api_response
-          }`;
+          }]`;
           const failnote = `Unable to purchase ${service.network} ${pack.title} cable plan to ${iuc}`;
           const txid = `TXID_${otpGenerator.generate(5, {
             digits: true,
@@ -1096,9 +1096,9 @@ exports.CableBill = async (req, res) => {
           })}${date.getTime()}`;
           const errmsg = `Transaction Not Successful`;
           const title = "cable purchase";
-          const adminnote = `${
+          const adminnote = `${pack.title} Purchase Successful to ${iuc}. - [${
             result.data.message || result.data.msg || result.data.api_response
-          }`;
+          }]`;
 
           console.log(
             "zoned",
@@ -1547,9 +1547,9 @@ exports.ElectricityBill = async (req, res) => {
       }
       const date = new Date();
       // const note = `${pack.title} Purchase Successful to ${iuc}.`;
-      const note = `${
+      const note = `${pack.title} Purchase Successful to ${iuc}. - [${
         result.data.message || result.data.msg || result.data.api_response
-      }`;
+      }]`;
       const failnote = `Unable to purchase ${service.network} ${pack.title} electricity plan to ${iuc}`;
       const txid = `TXID_${otpGenerator.generate(5, {
         digits: true,
@@ -1559,9 +1559,9 @@ exports.ElectricityBill = async (req, res) => {
       })}${date.getTime()}`;
       const errmsg = `Transaction Not Successful`;
       const title = "electricity purchase";
-      const adminnote = `${
+      const adminnote = `${pack.title} Purchase Successful to ${iuc}. - [${
         result.data.message || result.data.msg || result.data.api_response
-      }`;
+      }]`;
 
       console.log(
         "zoned",
@@ -1698,9 +1698,9 @@ exports.ElectricityBill = async (req, res) => {
           }
           const date = new Date();
           // const note = `${pack.title} Purchase Successful to ${iuc}.`;
-          const note = `${
+          const note = `${pack.title} Purchase Successful to ${iuc}. - [${
             result.data.message || result.data.msg || result.data.api_response
-          }`;
+          }]`;
           const failnote = `Unable to purchase ${service.network} ${pack.title} electricity plan to ${iuc}`;
           const txid = `TXID_${otpGenerator.generate(5, {
             digits: true,
@@ -1710,9 +1710,9 @@ exports.ElectricityBill = async (req, res) => {
           })}${date.getTime()}`;
           const errmsg = `Transaction Not Successful`;
           const title = "electricity purchase";
-          const adminnote = `${
+          const adminnote = `${pack.title} Purchase Successful to ${iuc}. - [${
             result.data.message || result.data.msg || result.data.api_response
-          }`;
+          }]`;
 
           console.log(
             "zoned",
@@ -2154,9 +2154,9 @@ exports.ExamBill = async (req, res) => {
       }
       const date = new Date();
       // const note = `${pack.title} Purchase Successful to ${mobile}.`;
-      const note = `${
+      const note = `${pack.title} Purchase Successful to ${mobile}. - [${
         result.data.message || result.data.msg || result.data.api_response
-      }`;
+      }]`;
       const failnote = `Unable to purchase ${pack.title} exam plan to ${mobile}`;
       const txid = `TXID_${otpGenerator.generate(5, {
         digits: true,
@@ -2166,9 +2166,9 @@ exports.ExamBill = async (req, res) => {
       })}${date.getTime()}`;
       const errmsg = `Transaction Not Successful`;
       const title = "exam purchase";
-      const adminnote = `${
+      const adminnote = `${pack.title} Purchase Successful to ${mobile}. - [${
         result.data.message || result.data.msg || result.data.api_response
-      }`;
+      }]`;
 
       console.log(
         "zoned",
@@ -2290,9 +2290,9 @@ exports.ExamBill = async (req, res) => {
           }
           const date = new Date();
           // const note = `${pack.title} Purchase Successful to ${iuc}.`;
-          const note = `${
+          const note = `${pack.title} Purchase Successful to ${iuc}. - [${
             result.data.message || result.data.msg || result.data.api_response
-          }`;
+          }]`;
           const failnote = `Unable to purchase ${pack.title} exam plan to ${iuc}`;
           const txid = `TXID_${otpGenerator.generate(5, {
             digits: true,
@@ -2302,9 +2302,9 @@ exports.ExamBill = async (req, res) => {
           })}${date.getTime()}`;
           const errmsg = `Transaction Not Successful`;
           const title = "exam purchase";
-          const adminnote = `${
+          const adminnote = `${pack.title} Purchase Successful to ${iuc}. - [${
             result.data.message || result.data.msg || result.data.api_response
-          }`;
+          }]`;
 
           console.log(
             "zoned",

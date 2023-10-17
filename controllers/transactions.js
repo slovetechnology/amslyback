@@ -35,3 +35,16 @@ exports.AdminGetAllTransactions = async (req, res) => {
     }
 }
 
+exports.AdminFiltersTransactions = async (req, res) => {
+    try {
+        const {status, limit, service, category, search} = req.body 
+        const items = await Admintransaction.findAll({
+            where: {status: status, service: service},
+            limit: parseInt(limit)
+        })
+
+        return res.json({status: 200, msg: items})
+    } catch(error) {
+        ServerError(res, error)
+    }
+}
