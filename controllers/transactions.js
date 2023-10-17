@@ -9,7 +9,8 @@ exports.AllUserTransactions = async (req, res) => {
         const trans = await Transaction.findAll({
             where: {user: req.user},
             include: [{model: User, as: 'trans'}],
-            order: [['createdAt', 'DESC']]
+            order: [['createdAt', 'DESC']],
+            limit: 30,
         })
         return res.json({status: 200, msg: trans})
     } catch (error) {
