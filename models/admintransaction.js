@@ -7,6 +7,7 @@ module.exports = (sequelize, DataTypes) => {
         amount: {type: DataTypes.FLOAT},
         note: {type: DataTypes.STRING(1000)},
         status: {type: DataTypes.STRING, allowNull: true},
+        service: {type: DataTypes.INTEGER, allowNull: true},
         txid: {type: DataTypes.STRING, allowNull: true},
         prevbal: {type: DataTypes.FLOAT, allowNull: true},
         currbal: {type: DataTypes.FLOAT, allowNull: true},

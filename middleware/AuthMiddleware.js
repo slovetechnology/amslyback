@@ -2,9 +2,9 @@ const jwt = require('jsonwebtoken')
 
 exports.AllRoutes = (req, res, next) => {
     try {
-        const authHeaders = req.headers.authorization
-        if(!authHeaders || !authHeaders.startsWith('Bearer ')) return res.json({status: 400, msg: `Access Denied`})
-        const token = authHeaders.split(' ')[1]
+        const authHeaders = req.headers.token
+        if(!authHeaders) return res.json({status: 400, msg: `Access Denied`})
+        const token = authHeaders
         const decoded = jwt.verify(token, process.env.JWT_SECRET)
         if(!decoded) return res.json({status: 400, msg: `Your session has expired`})
         req.user = decoded.id
@@ -16,9 +16,9 @@ exports.AllRoutes = (req, res, next) => {
 
 exports.UserRoutes = (req, res, next) => {
     try {
-        const authHeaders = req.headers.authorization
-        if(!authHeaders || !authHeaders.startsWith('Bearer ')) return res.json({status: 400, msg: `Access Denied`})
-        const token = authHeaders.split(' ')[1]
+        const authHeaders = req.headers.token
+        if(!authHeaders) return res.json({status: 400, msg: `Access Denied`})
+        const token = authHeaders
         const decoded = jwt.verify(token, process.env.JWT_SECRET)
         if(!decoded) return res.json({status: 400, msg: `Your session has expired`})
 
@@ -32,9 +32,9 @@ exports.UserRoutes = (req, res, next) => {
 
 exports.AdminRoutes = (req, res, next) => {
     try {
-        const authHeaders = req.headers.authorization
-        if(!authHeaders || !authHeaders.startsWith('Bearer ')) return res.json({status: 400, msg: `Access Denied`})
-        const token = authHeaders.split(' ')[1]
+        const authHeaders = req.headers.token
+        if(!authHeaders) return res.json({status: 400, msg: `Access Denied`})
+        const token = authHeaders
         const decoded = jwt.verify(token, process.env.JWT_SECRET)
         if(!decoded) return res.json({status: 400, msg: `Your session has expired`})
 

@@ -3,12 +3,18 @@ const User = require('../models').users
 const Admincontact = require('../models').admincontacts
 const Transaction = require('../models').transactions
 const Admintransaction = require('../models').admintransactions
+const Withdraw = require('../models').withdraws
 const Level = require('../models').levels
 const Deposit = require('../models').deposits
+const Automation = require('../models').automations
+const Subscription = require('../models').subscriptions
 const bcrypt = require('bcryptjs')
 const jwt = require('jsonwebtoken')
 const otpGenerator = require('otp-generator')
-const { ServerError } = require('../config/utils')
+const { ServerError, ServerCurrency } = require('../config/utils')
+const fs = require('fs')
+
+const exclusions = ['password', 'apitoken', 'datapin', 'pin', 'pass', 'refid', 'prevbalance', 'balance', 'block', 'resetcode', 'upline', 'updatedAt']
 
 const validateFormData = (firstname, lastname, phone, email, username, password, confirm_password) => {
     if (!firstname) return res.json({ status: 400, msg: `firstname is required` })
@@ -43,26 +49,26 @@ exports.UserSignup = async (req, res) => {
             specialChars: false
         })
 
-        const options = {digits: true, upperCase: true, specialChars: false, lowerCase: false}
+        const options = { digits: true, upperCase: true, specialChars: false, lowerCase: false }
         const getsalt = bcrypt.genSaltSync(10)
         const newpswd = bcrypt.hashSync(password, getsalt)
-        const refData = `REF_${firstname.slice(-3)}${otpGenerator.generate(8, {...options})}${lastname.slice(-3)}`
+        const refData = `REF_${firstname.slice(-3)}${otpGenerator.generate(8, { ...options })}${lastname.slice(-3)}`
         const newuser = { firstname, upline: upline, refid: refData, role: `user`, lastname, email, phone, username, resetcode: otp, pass: password, password: newpswd, verified: 'false', status: 'offline' }
         const userData = await User.create(newuser)
 
         // now check if there is no level then create on and tag the user to it, else just tag user to the level
         const findLevel = await Level.findAndCountAll({})
-        if(findLevel.count === 0) {
-            const levelFile = {title: 'Level 1'}
+        if (findLevel.count === 0) {
+            const levelFile = { title: 'Level 1' }
             const lev = await Level.create(levelFile)
 
-            userData.level = lev.id 
+            userData.level = lev.id
             await userData.save()
         }
         return res.json({ status: 200, msg: email })
 
     } catch (error) {
-      ServerError(res, error)
+        ServerError(res, error)
     }
 }
 
@@ -77,7 +83,7 @@ exports.VerifySignupWithOtp = async (req, res) => {
         await user.save()
         return res.json({ status: 200, msg: 'Account Successfully Verified!', token })
     } catch (error) {
-      ServerError(res, error)
+        ServerError(res, error)
     }
 }
 
@@ -97,7 +103,7 @@ exports.ResetVerificationOTP = async (req, res) => {
         await user.save()
         return res.json({ status: 200, msg: `Verification code sent!.` })
     } catch (error) {
-      ServerError(res, error)
+        ServerError(res, error)
     }
 }
 
@@ -111,11 +117,11 @@ exports.UserLogin = async (req, res) => {
 
         // now check if there is no level then create on and tag the user to it, else just tag user to the level
         const findLevel = await Level.findAndCountAll({})
-        if(findLevel.count === 0) {
-            const levelFile = {title: 'Level 1'}
+        if (findLevel.count === 0) {
+            const levelFile = { title: 'Level 1' }
             const lev = await Level.create(levelFile)
 
-            user.level = lev.id 
+            user.level = lev.id
             await user.save()
         }
 
@@ -127,7 +133,14 @@ exports.UserLogin = async (req, res) => {
         await user.save()
 
         const token = jwt.sign({ id: user.id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '0.5d' })
-        return res.json({ status: 200, msg: `Welcome back ${user.firstname}, glad to host you again`, token: token })
+        const gens = jwt.sign({ id: user.id, role: user.role }, process.env.JWT_SECRET)
+
+        if (user.apitoken === null) {
+            user.apitoken = gens
+            await user.save()
+        }
+
+        return res.json({ status: 200, msg: `Welcome back ${user.firstname}, glad to host you again`, token: token, api: user.apitoken })
     } catch (error) {
         ServerError(res, error)
     }
@@ -135,24 +148,24 @@ exports.UserLogin = async (req, res) => {
 
 exports.FetchuserAccount = async (req, res) => {
     try {
-        const user = await User.findOne({ 
+        const user = await User.findOne({
             where: { id: req.user },
-            include: [{model: Level, as: 'levels'}]
-         })
+            attributes: { exclude: ['password'] },
+            include: [{ model: Level, as: 'levels' }]
+        })
         if (!user) return res.json({ status: 400, msg: `User not found` })
-        const options = {digits: true, upperCase: true, specialChars: false, lowerCase: false}
-        const gens = `API_${otpGenerator.generate(50, {...options})}`
-        const refData = `REF_${user.firstname.slice(-3)}${otpGenerator.generate(8, {...options})}${user.lastname.slice(-3)}`
-        if(user.refid === null) {
-            user.apitoken = gens.toUpperCase()
+        const options = { digits: true, upperCase: true, specialChars: false, lowerCase: false }
+        const refData = `REF_${user.firstname.slice(-3)}${otpGenerator.generate(8, { ...options })}${user.lastname.slice(-3)}`
+
+        if (user.refid === null) {
             user.refid = refData.toUpperCase()
             await user.save()
         }
 
         const levels = await Level.findAll({})
-       return res.json({ status: 200, msg: user, levels });
+        return res.json({ status: 200, msg: user, levels });
     } catch (error) {
-      ServerError(res, error)
+        ServerError(res, error)
     }
 }
 
@@ -163,15 +176,15 @@ exports.UserLogout = async (req, res) => {
         await user.save()
         return res.json({ status: 200, msg: `User logged out` })
     } catch (error) {
-      ServerError(res, error)
+        ServerError(res, error)
     }
 }
 
 exports.FetchMyDownliners = async (req, res) => {
     try {
-        const findMe = await User.findOne({where: {id: req.user}})
+        const findMe = await User.findOne({ where: { id: req.user } })
         const users = await User.findAll({
-            where: {upline: findMe.refid},
+            where: { upline: findMe.refid },
             order: [['createdAt', 'DESC']]
         })
         const mapped = []
@@ -186,9 +199,9 @@ exports.FetchMyDownliners = async (req, res) => {
             return mapped.push(selectFields)
         })
 
-        return res.json({status: 200, msg: mapped})
+        return res.json({ status: 200, msg: mapped })
     } catch (error) {
-        return res.json({status: 400, msg: `Error ${error}`})
+        ServerError(res, error)
     }
 }
 
@@ -201,7 +214,7 @@ exports.SetupAccessPin = async (req, res) => {
         await user.save()
         return res.json({ status: 200, msg: `Access Pin set successfully`, user })
     } catch (error) {
-      ServerError(res, error)
+        ServerError(res, error)
     }
 }
 
@@ -222,7 +235,7 @@ exports.ConfirmAdminLoginAccess = async (req, res) => {
         const token = jwt.sign({ id: findEmail.id, role: findEmail.role }, process.env.JWT_SECRET, { expiresIn: '0.5d' })
         return res.json({ status: 200, msg: `Welcome back ${findEmail.firstname}, glad to host you again`, token: token })
     } catch (error) {
-      ServerError(res, error)
+        ServerError(res, error)
     }
 }
 
@@ -237,7 +250,7 @@ exports.AdminFetchAllUsersMobile = async (req, res) => {
         })
         return res.json({ status: 200, msg: phones })
     } catch (error) {
-      ServerError(res, error)
+        ServerError(res, error)
     }
 }
 
@@ -252,13 +265,15 @@ exports.AdminFetchAllUsersEmails = async (req, res) => {
         })
         return res.json({ status: 200, msg: emails })
     } catch (error) {
-      ServerError(res, error)
+        ServerError(res, error)
     }
 }
 // admin get all users
-exports.AdminFetchAllUsers = async (req, res) => { 
+exports.AdminFetchAllUsers = async (req, res) => {
     try {
-        const users = await User.findAll({})
+        const users = await User.findAll({
+            attributes: {exclude: exclusions}
+        })
         const levels = await Level.findAll({})
         const mapped = []
         await users.map(async (ele) => {
@@ -271,7 +286,7 @@ exports.AdminFetchAllUsers = async (req, res) => {
         })
         return res.json({ status: 200, msg: mapped })
     } catch (error) {
-      ServerError(res, error)
+        ServerError(res, error)
     }
 }
 
@@ -288,16 +303,16 @@ exports.AdminBlockUserAccount = async (req, res) => {
         await user.save()
         return res.json({ status: 200, msg: `${user.firstname}'s account has been successfully ${status === 'no' ? 'Unblocked' : 'Blocked'}` })
     } catch (error) {
-      ServerError(res, error)
+        ServerError(res, error)
     }
 }
 
 exports.AdminGetContactInfo = async (req, res) => {
     try {
-        const contact = await Admincontact.findOne({where: {user_id: req.user}})
-        return res.json({status: 200, msg: contact})
+        const contact = await Admincontact.findOne({ where: { user_id: req.user } })
+        return res.json({ status: 200, msg: contact })
     } catch (error) {
-        return res.json({ status: 400, msg: `Error ${error}`})
+        return res.json({ status: 400, msg: `Error ${error}` })
     }
 }
 
@@ -320,103 +335,276 @@ exports.AdminAddContactInfo = async (req, res) => {
             info.instagram = instagram
             info.linkedin = linkedin
             await info.save()
-            return res.json({status: 200, msg: `Contact information successfully updated`})
+            return res.json({ status: 200, msg: `Contact information successfully updated` })
         }
 
         // if info does not exist
         if (!info) {
             const newinfo = { user_id: req.user, mobile, address, email, facebook, whatsapp, twitter, instagram, linkedin }
             await Admincontact.create(newinfo)
-            return res.json({status: 200, msg: `Contact information successfully created`})
+            return res.json({ status: 200, msg: `Contact information successfully created` })
         }
     } catch (error) {
-      ServerError(res, error)
+        ServerError(res, error)
     }
 }
 
 exports.AdminUpdateUserpassword = async (req, res) => {
     try {
-        const {email, password, confirm_password} = req.body 
-        if(!email || !password || !confirm_password) return res.json({status: 400, msg: `make sure all fields are properly filled`})
-        if(password!== confirm_password) return res.json({status: 400, msg: `Passwords do not match`})
-        const user = await User.findOne({where: {email: email}})
-        if(!user) return res.json({status: 400, msg: `User not found`})
-        if(user.id === req.user) return res.json({status: 400, msg: `You can only update a user account`})
+        const { email, password, confirm_password } = req.body
+        if (!email || !password || !confirm_password) return res.json({ status: 400, msg: `make sure all fields are properly filled` })
+        if (password !== confirm_password) return res.json({ status: 400, msg: `Passwords do not match` })
+        const user = await User.findOne({ where: { email: email } })
+        if (!user) return res.json({ status: 400, msg: `User not found` })
+        if (user.id === req.user) return res.json({ status: 400, msg: `You can only update a user account` })
         const getSalt = bcrypt.genSaltSync(10)
         const newpswd = bcrypt.hashSync(password, getSalt)
         user.password = newpswd
         user.pass = password
         await user.save()
-        return res.json({status: 200, msg: `Password successfully updated`})
+        return res.json({ status: 200, msg: `Password successfully updated` })
     } catch (error) {
-        return res.json({status: 400, msg: `Error ${error}`})
+        ServerError(res, error)
     }
-} 
+}
 
 exports.AdminUpdateUserpin = async (req, res) => {
     try {
-        const {email, pin, confirm_pin} = req.body 
-        if(!email || !pin || !confirm_pin) return res.json({status: 400, msg: `make sure all fields are properly filled`})
-        if(pin!== confirm_pin) return res.json({status: 400, msg: `pins do not match`})
-        const user = await User.findOne({where: {email: email}})
-        if(!user) return res.json({status: 400, msg: `User not found`})
-        if(user.id === req.user) return res.json({status: 400, msg: `You can only update a user account`})
+        const { email, pin, confirm_pin } = req.body
+        if (!email || !pin || !confirm_pin) return res.json({ status: 400, msg: `make sure all fields are properly filled` })
+        if (pin !== confirm_pin) return res.json({ status: 400, msg: `pins do not match` })
+        const user = await User.findOne({ where: { email: email } })
+        if (!user) return res.json({ status: 400, msg: `User not found` })
+        if (user.id === req.user) return res.json({ status: 400, msg: `You can only update a user account` })
         user.datapin = pin
         await user.save()
-        return res.json({status: 200, msg: `pin successfully updated`})
+        return res.json({ status: 200, msg: `pin successfully updated` })
     } catch (error) {
-        return res.json({status: 400, msg: `Error ${error}`})
+        ServerError(res, error)
     }
-} 
+}
 
 exports.CreatDataPin = async (req, res) => {
     try {
-        const {pin, confirm_pin} = req.body 
+        const { pin, confirm_pin } = req.body
 
-        if(!pin) return res.json({status: 400, msg: `Invalid pin`})
-        if(!confirm_pin) return res.json({status: 400, msg: `Invalid confirmation pin`})
-        if(confirm_pin !== pin) return res.json({status: 400, msg: `Validation Error: pin(s) not matched`})
-        if(pin.length < 4) return res.json({status: 400, msg: `Pin must be at least 4 characters long`})
-        if(confirm_pin.length < 4) return res.json({status: 400, msg: `Confirm pin must be at least 4 characters long`})
+        if (!pin) return res.json({ status: 400, msg: `Invalid pin` })
+        if (!confirm_pin) return res.json({ status: 400, msg: `Invalid confirmation pin` })
+        if (confirm_pin !== pin) return res.json({ status: 400, msg: `Validation Error: pin(s) not matched` })
+        if (pin.length < 4) return res.json({ status: 400, msg: `Pin must be at least 4 characters long` })
+        if (confirm_pin.length < 4) return res.json({ status: 400, msg: `Confirm pin must be at least 4 characters long` })
         const user = await User.findByPk(req.user)
 
-        user.datapin = pin 
+        user.datapin = pin
         await user.save()
-        return res.json({status: 200, user: user, msg: `Transaction Pin successfully created`})
+        return res.json({ status: 200, user: user, msg: `Transaction Pin successfully created` })
     } catch (error) {
-      ServerError(res, error)
+        ServerError(res, error)
     }
 }
 
 exports.AdminFinanceUser = async (req, res) => {
     try {
-        const {email, amount, note} = req.body 
-        if(!email || !amount || !note) return res.json({status: 400, msg: `Error completing process, please provide all required fields!`})
-        const user = await User.findOne({where: {email: email}})
-        if(!user) return res.json({status: 400, msg: `User Not Found`})
+        const { email, amount, note } = req.body
+        if (!email || !amount || !note) return res.json({ status: 400, msg: `Error completing process, please provide all required fields!` })
+        const user = await User.findOne({ where: { email: email } })
+        if (!user) return res.json({ status: 400, msg: `User Not Found` })
         // check is there is a minus on the amount 
         const date = new Date()
-        const txid = `TXID_${otpGenerator.generate(5, {digits: true, specialChars: false, lowerCaseAlphabets: true, upperCaseAlphabets: true})}${date.getTime()}`
+        const txid = `TXID_${otpGenerator.generate(5, { digits: true, specialChars: false, lowerCaseAlphabets: true, upperCaseAlphabets: true })}${date.getTime()}`
         const title = 'wallet funding'
-        if(amount.startsWith('-')) {
+        if (amount.startsWith('-')) {
             // check if user balance is initially 0
             // if(user.balance === 0) return res.json({status: 400, msg: `Cannot deduct from user balance, fund this user first in order to perform deduction of funds`})
             user.prevbalance = user.balance
             user.balance = eval(`${user.balance}${amount}`)
-        }else {
-            user.prevbalance = user.balance 
+        } else {
+            user.prevbalance = user.balance
             user.balance = eval(`${user.balance}+${amount}`)
         }
         await user.save()
-        const newdept = {user: user.id, note, amount, status: 'success', txid, prevbal: user.prevbalance, currbal: user.balance, title}
+        const newdept = { user: user.id, note, amount, status: 'success', txid, prevbal: user.prevbalance, currbal: user.balance, title }
         const depo = await Deposit.create(newdept)
 
-        const newtrans = {user: user.id, note, amount, tag: depo.id, status: 'success', txid, prevbal: user.prevbalance, currbal: user.balance, title}
+        const newtrans = { user: user.id, note, amount, tag: depo.id, status: 'success', txid, prevbal: user.prevbalance, currbal: user.balance, title }
         await Transaction.create(newtrans)
         await Admintransaction.create(newtrans)
 
-        return res.json({status: 200, msg: `User Account Updated successfully`, user})
+        return res.json({ status: 200, msg: `User Account Updated successfully`, user })
     } catch (error) {
-        return res.json({status: 400, msg: `Error ${error}`})
+        ServerError(res, error)
+    }
+}
+
+exports.KycUpload = async (req, res) => {
+    try {
+        const { gender, maritalStatus, kyc, dob, address, kycnote } = req.body
+        if (!gender || !maritalStatus || !kyc || !dob || !address) return res.json({ status: 404, msg: `Incomplete request found` })
+        if (kyc === 'nin') {
+            if (!kycnote) return res.json({ status: 404, msg: `provide your complete detail` })
+        }
+        const user = await User.findByPk(req.user)
+        if(user.verified === 'verified') return res.json({status: 200, msg: `You are already verified`})
+        if(user.verified === 'declined') return res.json({status: 400, msg: `Your request was declined, cannot submit document at the moment`})
+        if(user.kyc !== null) return res.json({status: 400, msg: `You have already submitted your kyc document `})
+        const idfront = !req?.files?.idfront ? null : req.files.idfront
+        const idback = !req?.files?.idback ? null : req.files.idback
+        const date = new Date()
+        let frontName, backName
+        const dirPath = `./public/documents`
+        if (idfront) {
+            if (!fs.existsSync(dirPath)) {
+                fs.mkdirSync(dirPath)
+            }
+            frontName = `${user.firstname.slice(-3)}_front_${date.getTime()}.webp`
+            await idfront.mv(`${dirPath}/${frontName}`)
+        } else {
+            firstName = null
+        }
+        if (idback) {
+            if (!fs.existsSync(dirPath)) {
+                fs.mkdirSync(dirPath)
+            }
+            backName = `${user.firstname.slice(-3)}_back_${date.getTime()}.webp`
+            await idback.mv(`${dirPath}/${backName}`)
+        } else {
+            backName = null
+        }
+        user.kyc = kyc
+        user.idfront = frontName
+        user.idback = backName
+        user.maritalStatus = maritalStatus
+        user.gender = gender
+        user.kycnote = kycnote
+        user.dob = dob
+        user.address = address
+        await user.save()
+
+        return res.json({ status: 200, msg: `Your KYC verification details has been successfully uploaded` })
+    } catch (error) {
+        ServerError(res, error)
+    }
+}
+
+exports.UpdateUserKyc = async (req, res) => {
+    try {
+        const { note, userid, tag } = req.body
+        if (!tag || !userid) return res.json({ status: 404, msg: `Incomplete request found` })
+        const user = await User.findByPk(userid)
+        if (!user) return res.json({ status: 404, msg: `User not found` })
+        if (user.verified === 'declined') return res.json({ status: 400, msg: `Kyc verification already declined` })
+        if (user.verified === 'verified') return res.json({ status: 400, msg: `Kyc verification already verified` })
+        if (tag === 'declined') {
+            if (!note) return res.json({ status: 404, msg: `Specify your reason for declining this document` })
+            user.note = note
+            user.verified = 'declined'
+        } else {
+            user.verified = 'verified'
+        }
+        await user.save()
+
+
+        return res.json({ status: 200, msg: `${user.firstname} successfully ${tag}` })
+    } catch (error) {
+        ServerError(res, error)
+    }
+}
+
+
+exports.DeleteKycDocument = async (req, res) => {
+    try {
+        const { userid } = req.body
+        const user = await User.findByPk(userid)
+        if (!user) return res.json({ status: 404, msg: `User not found` })
+
+        if(user.verified !== 'declined') return res.json({status: 400, msg: `An Action has already been carried out on this verification.`})
+        const frontPath = `./public/documents/${user.idfront}`
+        const backPath = `./public/documents/${user.idback}`
+        if (fs.existsSync(frontPath)) {
+            fs.unlinkSync(frontPath)
+        }
+        if (fs.existsSync(backPath)) {
+            fs.unlinkSync(backPath)
+        }
+        user.verified = true
+        user.idfront = null 
+        user.idback = null
+        user.note = null
+        user.kyc = null
+        user.kycnote = null
+        user.maritalStatus = null
+        user.gender = null
+        user.dob = null
+        user.address = null
+        await user.save()
+
+        return res.json({ status: 200, msg: `Kyc document successfully remove, ${user.firstname} can now upload a new kyc verification document` })
+    } catch (error) {
+        ServerError(res, error)
+    }
+}
+
+exports.AdminDashboard = async (req, res) => {
+    try {
+        const users = await User.findAll({})
+        const depts = await Deposit.findAll({})
+        const withd = await Withdraw.findAll({})
+        const subs = await Subscription.findAll({})
+        const auts = await Automation.findAll({})
+        const levs = await Level.findAll({})
+        // total users balance 
+        let balArr = 0
+        users.map(ele => {
+            balArr += parseInt(ele.balance)
+        })
+        // total deposited 
+        let deptArr = 0
+        let dept_success = 0
+        let dept_unsuccess = 0
+        depts.map(ele => {
+            deptArr += parseInt(ele.amount)
+            // total successful deposits
+            if (ele.status === 'success') {
+                dept_success += parseInt(ele.amount)
+            }
+            // total unsuccessful deposits
+            if (ele.status !== 'success') {
+                dept_unsuccess += parseInt(ele.amount)
+            }
+        })
+        // total withdrawn 
+        let withdArr = 0
+        let withd_success = 0
+        let withd_unsuccess = 0
+        withd.map(ele => {
+            withdArr += parseInt(ele.amount)
+            // total successful withdrawals
+            if (ele.status === 'success') {
+                withd_success += parseInt(ele.amount)
+            }
+            // total unsuccessful withdrawals
+            if (ele.status !== 'success') {
+                withd_unsuccess += parseInt(ele.amount)
+            }
+        })
+        const baled = balArr.toLocaleString()
+        
+        const details = [
+            { title: 'total users', val: users.length.toLocaleString() },
+            { title: 'total deposits', val: depts.length.toLocaleString() },
+            { title: 'total deposited', val: `${ServerCurrency}${deptArr.toLocaleString()}` },
+            { title: 'successful deposits', val: `${ServerCurrency}${dept_success.toLocaleString()}` },
+            { title: 'unsuccessful deposits', val: `${ServerCurrency}${dept_unsuccess.toLocaleString()}` },
+            { title: 'total withdrawals', val: withd.length.toLocaleString() },
+            { title: 'total withdrawn', val: `${ServerCurrency}${withdArr.toLocaleString()}` },
+            { title: 'successful withdrawals', val: `${ServerCurrency}${withd_success.toLocaleString()}` },
+            { title: 'unsuccessful withdrawals', val: `${ServerCurrency}${withd_unsuccess.toLocaleString()}` },
+            { title: 'total services', val: subs.length.toLocaleString() },
+            { title: 'total automations', val: auts.length.toLocaleString() },
+            { title: 'total levels created', val: levs.length.toLocaleString() }
+        ]
+        return res.json({ status: 200, details, userBal: baled })
+    } catch (error) {
+        ServerError(res, error)
     }
 }

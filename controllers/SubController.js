@@ -28,8 +28,8 @@ exports.AllSubscriptions = async (req, res) => {
 };
 exports.AdminCreateSubscription = async (req, res) => {
   try {
-    const { network, category, packages, tag, percent } = req.body;
-    if (!network || !category)
+    const { network, category, packages, tag, percent, min, max } = req.body;
+    if (!network || !category || !min || !max)
       return res.json({ status: 400, msg: `Provide a complete information` });
     // check if subscription for the package already exists
     const checksub = await Subscription.findOne({
@@ -37,7 +37,7 @@ exports.AdminCreateSubscription = async (req, res) => {
     });
     if (!checksub) {
       const slugcat = slug(category, "-");
-      const newsub = { network, category: slugcat, tag, percent};
+      const newsub = { network, category: slugcat, tag, percent, min, max};
       const subs = await Subscription.create(newsub);
       packages.map(async (item) => {
         const newpack = {
@@ -71,8 +71,8 @@ exports.AdminCreateSubscription = async (req, res) => {
 };
 exports.AdminEditSubscription = async (req, res) => {
   try {
-    const { category, network, packages, id, tag, percent } = req.body;
-    if (!network || !category)
+    const { category, network, packages, id, tag, percent, min, max } = req.body;
+    if (!network || !category || !min || !max)
       return res.json({ status: 400, msg: `Provide a complete information` });
     const subs = await Subscription.findOne({ where: { id: id } });
     // first update the packages
@@ -101,6 +101,8 @@ exports.AdminEditSubscription = async (req, res) => {
     subs.category = slugcat;
     subs.tag = tag;
     subs.percent = percent
+    subs.min = min
+    subs.max = max
     await subs.save();
 
     return res.json({ status: 200, msg: `Subscription successfully updated` });
@@ -978,7 +980,17 @@ exports.FetchSingleLevel = async (req, res) => {
 exports.FetchLevels = async (req, res) => {
   try {
     const lev = await Level.findAll({});
-    return res.json({ status: 200, msg: lev });
+    const users = await User.findAll({})
+    const data = []
+    lev.map(item => {
+      const userArr = users.filter(ele => ele.level === item.id)
+      const dataArr = {
+        ...item.dataValues,
+        users: userArr.length
+      }
+      data.push(dataArr)
+    })
+    return res.json({ status: 200, msg: data });
   } catch (error) {
     ServerError(res, error);
   }

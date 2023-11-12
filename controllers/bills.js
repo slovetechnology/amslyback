@@ -15,6 +15,8 @@ const slug = require("slug");
 const otpGenerator = require("otp-generator");
 const axios = require("axios");
 const { ServerError } = require("../config/utils");
+const Level = require('../models').levels
+const Levelpack = require('../models').levelpackages
 
 // purchasing data
 exports.DataBills = async (req, res) => {
@@ -36,6 +38,9 @@ exports.DataBills = async (req, res) => {
     // check is package exists
     const pack = await Subscriptiondata.findOne({ where: { id: package } });
     if (!pack) return res.json({ status: 400, msg: `Package Not Found` });
+
+    const level = await Level.findOne({ where: { id: user.level } })
+    const levelPack = await Levelpack.findOne({ where: { level: level.id, pack: package } })
 
     // check if there is an automation service connected to the package
     const autos = await Automation.findOne({
@@ -88,19 +93,11 @@ exports.DataBills = async (req, res) => {
         options = {};
       }
 
-      const getFormdata = `${url}?${autos?.tokenName}=${autos.token}${
-        autos.refName ? `&${autos.refName}=${autos.refid}` : ""
-      }${autos.planName ? `&${autos.planName}=${pack.deal}` : ""}${
-        autos.networkName ? `&${autos.networkName}=${pack.autoNetwork}` : ""
-      }${autos.mobileName ? `&${autos.mobileName}=${mobile}` : ""}${
-        autos.callbackName ? `&${autos.callbackName}=${autos.callback}` : ""
-      }${
-        autos.portedNumber
-          ? `&${autos.portedName}=${
-              autos.portedNumber === "true" ? true : false
-            }`
-          : ""
-      }`;
+      const getFormdata = `${url}?${autos?.tokenName}=${autos.token}${autos.refName ? `&${autos.refName}=${autos.refid}` : ""
+        }${autos.planName ? `&${autos.planName}=${pack.deal}` : ""}${autos.networkName ? `&${autos.networkName}=${pack.autoNetwork}` : ""
+        }${autos.mobileName ? `&${autos.mobileName}=${mobile}` : ""}${autos.callbackName ? `&${autos.callbackName}=${autos.callback}` : ""
+        }${autos.portedNumber ? `&${autos.portedName}=${autos.portedNumber === "true" ? true : false}` : ""
+        }`;
 
       console.log(
         options,
@@ -124,12 +121,12 @@ exports.DataBills = async (req, res) => {
       }
       const date = new Date();
       // const note = `${sub.network} ${pack.title} Purchase Successful to ${mobile},  [You have successfull shared ${pack.title} Data to ${mobile}.]`;
-      const note = `${sub.network} ${pack.title} Purchase Successful to ${mobile} - [${
-        result.data.message ||
+      const note = `${sub.network} ${pack.title} Purchase Successful to ${mobile} - [${result.data.message ||
         result.data.msg ||
         result.data.api_response ||
+        result.data.data.server_message ||
         result.data.data.true_response
-      }]`;
+        }]`;
 
       const failnote = `Unable to purchase ${sub.network} ${pack.title} data plan to ${mobile}`;
       const txid = `TXID_${otpGenerator.generate(5, {
@@ -140,12 +137,12 @@ exports.DataBills = async (req, res) => {
       })}${date.getTime()}`;
       const errmsg = `Transaction Not Successful`;
       const title = "data purchase";
-      const adminnote = `${sub.network} ${pack.title} Purchase Successful to ${mobile} - [${
-        result.data.message ||
+      const adminnote = `${sub.network} ${pack.title} Purchase Successful to ${mobile} - [${result.data.message ||
         result.data.msg ||
         result.data.api_response ||
+        result.data.data.server_message ||
         result.data.data.true_response
-      }]`;
+        }]`;
 
       console.log(
         "zoned",
@@ -162,22 +159,23 @@ exports.DataBills = async (req, res) => {
         result.data.code === "200" ||
         result.data.status === "success" ||
         result.data.Status === "successful" ||
-        result.data.status === true
+        result.data.data.status === true
       ) {
         //deduct from user balance
         user.prevbalance = user.balance;
-        user.balance = eval(`${user.balance} - ${pack.price}`);
+        user.balance = eval(`${user.balance} - ${levelPack?.pricing ? levelPack.pricing : pack.price}`);
 
         await user.save();
         const newWithData = {
           user: user.id,
           autos: autos.title,
           note,
-          amount: pack.price,
+          amount: levelPack?.pricing ? levelPack.pricing : pack.price,
           txid,
           status: "success",
           prevbal: user.prevbalance,
           currbal: user.balance,
+          service: sub.id,
           title,
         };
         const withd = await Withdraw.create(newWithData);
@@ -186,12 +184,13 @@ exports.DataBills = async (req, res) => {
           user: user.id,
           autos: autos.title,
           note,
-          amount: pack.price,
+          amount: levelPack?.pricing ? levelPack.pricing : pack.price,
           txid,
           tag: withd.id,
           status: "success",
           prevbal: user.prevbalance,
           currbal: user.balance,
+          service: sub.id,
           title,
         };
         await Transaction.create(newtrans);
@@ -201,11 +200,12 @@ exports.DataBills = async (req, res) => {
           autos: autos.title,
           note: adminnote,
           txid,
-          amount: pack.price,
+          amount: levelPack?.pricing ? levelPack.pricing : pack.price,
           tag: withd.id,
           status: "success",
           prevbal: user.prevbalance,
           currbal: user.balance,
+          service: sub.id,
           title,
         };
         await Admintransaction.create(adminnewtrans);
@@ -242,25 +242,19 @@ exports.DataBills = async (req, res) => {
             altoptions;
           }
 
-          const altGetFormdata = `${altUrl}?${altAutos?.tokenName}=${
-            altAutos.token
-          }${altAutos.refName ? `&${altAutos.refName}=${altAutos.refid}` : ""}${
-            altAutos.planName ? `&${altAutos.planName}=${pack.altDeal}` : ""
-          }${
-            altAutos.networkName
+          const altGetFormdata = `${altUrl}?${altAutos?.tokenName}=${altAutos.token
+            }${altAutos.refName ? `&${altAutos.refName}=${altAutos.refid}` : ""}${altAutos.planName ? `&${altAutos.planName}=${pack.altDeal}` : ""
+            }${altAutos.networkName
               ? `&${altAutos.networkName}=${pack.altAutoNetwork}`
               : ""
-          }${altAutos.mobileName ? `&${altAutos.mobileName}=${mobile}` : ""}${
-            altAutos.callbackName
+            }${altAutos.mobileName ? `&${altAutos.mobileName}=${mobile}` : ""}${altAutos.callbackName
               ? `&${altAutos.callbackName}=${altAutos.callback}`
               : ""
-          }${
-            altAutos.portedNumber
-              ? `&${altAutos.portedName}=${
-                  altAutos.portedNumber === "true" ? true : false
-                }`
+            }${altAutos.portedNumber
+              ? `&${altAutos.portedName}=${altAutos.portedNumber === "true" ? true : false
+              }`
               : ""
-          }`;
+            }`;
           // test for all request cases that matches
           if (altAutos.method === "GET" && altAutos.format === "HEAD") {
             result = await axios.get(altGetFormdata, altoptions);
@@ -280,12 +274,12 @@ exports.DataBills = async (req, res) => {
           // result = await axios.post(`https://zoedata.ng/api/v2/datashare/?api_key=6tg7x6CJ1LGKQuuRMTaIGy2MxFKX1oahJNqKZHYyMb8GjkAwGRxUPdPhGTkwV5gtdcwbeWhiKoB5TnqztNV2MbdXXrk3zeWnYEWHQFq2o2GKQdaAwT8moNHfmgEzK7aU&product_code=data_share_1gb&phone=08029706970&callback=https://zoedata.ng/webhook.php`)
           const date = new Date();
           // const note = `${sub.network} ${pack.title} Purchase Successful to ${mobile},  [You have successfull shared ${pack.title} Data to ${mobile}.]`;
-          const note = `${sub.network} ${pack.title} Purchase Successful to ${mobile} - [${
-            result.data.message ||
+          const note = `${sub.network} ${pack.title} Purchase Successful to ${mobile} - [${result.data.message ||
             result.data.msg ||
             result.data.api_response ||
+            result.data.data.server_message ||
             result.data.data.true_response
-          }]`;
+            }]`;
           const failnote = `Unable to purchase ${sub.network} ${pack.title} data plan to ${mobile}`;
           const txid = `TXID_${otpGenerator.generate(5, {
             digits: true,
@@ -295,12 +289,12 @@ exports.DataBills = async (req, res) => {
           })}${date.getTime()}`;
           const errmsg = `Transaction Not Successful`;
           const title = "data purchase";
-          const adminnote = `${sub.network} ${pack.title} Purchase Successful to ${mobile} - [${
-            result.data.message ||
+          const adminnote = `${sub.network} ${pack.title} Purchase Successful to ${mobile} - [${result.data.message ||
             result.data.msg ||
             result.data.api_response ||
+            result.data.data.server_message ||
             result.data.data.true_response
-          }]`;
+            }]`;
 
           console.log(
             "zoned",
@@ -317,22 +311,23 @@ exports.DataBills = async (req, res) => {
             result.data.code === "200" ||
             result.data.status === "success" ||
             result.data.Status === "successful" ||
-            result.data.status === true
+            result.data.data.status === true
           ) {
             //deduct from user balance
             user.prevbalance = user.balance;
-            user.balance = eval(`${user.balance} - ${pack.price}`);
+            user.balance = eval(`${user.balance} - ${levelPack?.pricing ? levelPack.pricing : pack.price}`);
 
             await user.save();
             const newWithData = {
               user: user.id,
               autos: altAutos.title,
               note,
-              amount: pack.price,
+              amount: levelPack?.pricing ? levelPack.pricing : pack.price,
               txid,
               status: "success",
               prevbal: user.prevbalance,
               currbal: user.balance,
+              service: sub.id,
               title,
             };
             const withd = await Withdraw.create(newWithData);
@@ -341,12 +336,13 @@ exports.DataBills = async (req, res) => {
               user: user.id,
               note,
               autos: altAutos.title,
-              amount: pack.price,
+              amount: levelPack?.pricing ? levelPack.pricing : pack.price,
               txid,
               tag: withd.id,
               status: "success",
               prevbal: user.prevbalance,
               currbal: user.balance,
+              service: sub.id,
               title,
             };
             await Transaction.create(newtrans);
@@ -356,11 +352,12 @@ exports.DataBills = async (req, res) => {
               autos: altAutos.title,
               note: adminnote,
               txid,
-              amount: pack.price,
+              amount: levelPack?.pricing ? levelPack.pricing : pack.price,
               tag: withd.id,
               status: "success",
               prevbal: user.prevbalance,
               currbal: user.balance,
+              service: sub.id,
               title,
             };
             await Admintransaction.create(adminnewtrans);
@@ -375,11 +372,12 @@ exports.DataBills = async (req, res) => {
               user: user.id,
               autos: altAutos.title,
               note: failnote,
-              amount: pack.price,
+              amount: levelPack?.pricing ? levelPack.pricing : pack.price,
               txid,
               status: "failed",
               prevbal: user.balance,
               currbal: user.balance,
+              service: sub.id,
               title,
             };
             const withd = await Withdraw.create(newWithData);
@@ -388,12 +386,13 @@ exports.DataBills = async (req, res) => {
               user: user.id,
               autos: altAutos.title,
               note: failnote,
-              amount: pack.price,
+              amount: levelPack?.pricing ? levelPack.pricing : pack.price,
               txid,
               tag: withd.id,
               status: "failed",
               prevbal: user.balance,
               currbal: user.balance,
+              service: sub.id,
               title,
             };
             await Transaction.create(newtrans);
@@ -403,11 +402,12 @@ exports.DataBills = async (req, res) => {
               autos: altAutos.title,
               note: `${failnote} - ${adminnote}`,
               txid,
-              amount: pack.price,
+              amount: levelPack?.pricing ? levelPack.pricing : pack.price,
               tag: withd.id,
               status: "failed",
               prevbal: user.balance,
               currbal: user.balance,
+              service: sub.id,
               title,
             };
             await Admintransaction.create(adminnewtrans);
@@ -420,11 +420,12 @@ exports.DataBills = async (req, res) => {
             user: user.id,
             autos: autos.title,
             note: failnote,
-            amount: pack.price,
+            amount: levelPack?.pricing ? levelPack.pricing : pack.price,
             txid,
             status: "failed",
             prevbal: user.balance,
             currbal: user.balance,
+            service: sub.id,
             title,
           };
           const withd = await Withdraw.create(newWithData);
@@ -433,12 +434,13 @@ exports.DataBills = async (req, res) => {
             user: user.id,
             autos: autos.title,
             note: failnote,
-            amount: pack.price,
+            amount: levelPack?.pricing ? levelPack.pricing : pack.price,
             txid,
             tag: withd.id,
             status: "failed",
             prevbal: user.balance,
             currbal: user.balance,
+            service: sub.id,
             title,
           };
           await Transaction.create(newtrans);
@@ -448,11 +450,12 @@ exports.DataBills = async (req, res) => {
             autos: autos.title,
             note: `${failnote} - ${adminnote}`,
             txid,
-            amount: pack.price,
+            amount: levelPack?.pricing ? levelPack.pricing : pack.price,
             tag: withd.id,
             status: "failed",
             prevbal: user.balance,
             currbal: user.balance,
+            service: sub.id,
             title,
           };
           await Admintransaction.create(adminnewtrans);
@@ -483,6 +486,10 @@ exports.AirtimeBill = async (req, res) => {
     // check is package exists
     const pack = await Subscriptiondata.findOne({ where: { id: network } });
     if (!pack) return res.json({ status: 400, msg: `Package Not Found` });
+
+    const level = await Level.findOne({ where: { id: user.level } })
+    const levelPack = await Levelpack.findOne({ where: { level: level.id, pack: pack.id } })
+
     // check if transaction pin matches
     if (pin !== user.datapin)
       return res.json({ status: 400, msg: `Invalid Transaction Pin detected` });
@@ -534,13 +541,10 @@ exports.AirtimeBill = async (req, res) => {
         [autos.networkName]: pack.autoNetwork,
       };
 
-      const getFormdata = `${url}?${autosParent?.tokenName}=${
-        autosParent.token
-      }${autos.refName ? `&${autos.refName}=${autosParent.refid}` : ""}${
-        autos.amountName ? `&${autos.amountName}=${amount}` : ""
-      }${autos.networkName ? `&${autos.networkName}=${pack.autoNetwork}` : ""}${
-        autos.mobileName ? `&${autos.mobileName}=${mobile}` : ""
-      }`;
+      const getFormdata = `${url}?${autosParent?.tokenName}=${autosParent.token
+        }${autos.refName ? `&${autos.refName}=${autosParent.refid}` : ""}${autos.amountName ? `&${autos.amountName}=${amount}` : ""
+        }${autos.networkName ? `&${autos.networkName}=${pack.autoNetwork}` : ""}${autos.mobileName ? `&${autos.mobileName}=${mobile}` : ""
+        }`;
 
       // test for all request cases that matches
       if (autos.method === "GET" && autos.format === "HEAD") {
@@ -559,6 +563,7 @@ exports.AirtimeBill = async (req, res) => {
       const note = `${pack.title} Purchase Successful to ${mobile} - [${result.data.message ||
         result.data.msg ||
         result.data.api_response ||
+        result.data.data.server_message ||
         result.data.data.true_response
         }]`;
       const failnote = `Unable to purchase ${service.network} ${pack.title} airtime plan to ${mobile}`;
@@ -570,12 +575,12 @@ exports.AirtimeBill = async (req, res) => {
       })}${date.getTime()}`;
       const errmsg = `Transaction Not Successful`;
       const title = "airtime purchase";
-      const adminnote = `${pack.title} Purchase Successful to ${mobile} - [${
-        result.data.message ||
+      const adminnote = `${pack.title} Purchase Successful to ${mobile} - [${result.data.message ||
         result.data.msg ||
         result.data.api_response ||
+        result.data.data.server_message ||
         result.data.data.true_response
-      }]`;
+        }]`;
 
       console.log(
         "zoned",
@@ -592,7 +597,8 @@ exports.AirtimeBill = async (req, res) => {
         result.data.status_code === "200" ||
         result.data.code === "200" ||
         result.data.status === "success" ||
-        result.data.Status === "successful"
+        result.data.Status === "successful" ||
+        result.data.data.status === true
       ) {
         //deduct from user balance
         user.prevbalance = user.balance;
@@ -607,6 +613,7 @@ exports.AirtimeBill = async (req, res) => {
           txid,
           status: "success",
           prevbal: user.prevbalance,
+          service: service.id,
           currbal: user.balance,
           title,
         };
@@ -620,6 +627,7 @@ exports.AirtimeBill = async (req, res) => {
           txid,
           tag: withd.id,
           status: "success",
+          service: service.id,
           prevbal: user.prevbalance,
           currbal: user.balance,
           title,
@@ -635,6 +643,7 @@ exports.AirtimeBill = async (req, res) => {
           tag: withd.id,
           status: "success",
           prevbal: user.prevbalance,
+          service: service.id,
           currbal: user.balance,
           title,
         };
@@ -660,17 +669,14 @@ exports.AirtimeBill = async (req, res) => {
             [altAutos.networkName]: pack.altAutoNetwork,
           };
 
-          const getFormdata = `${url}?${altAutosParent?.tokenName}=${
-            altAutosParent.token
-          }${
-            altAutos.refName
+          const getFormdata = `${url}?${altAutosParent?.tokenName}=${altAutosParent.token
+            }${altAutos.refName
               ? `&${altAutos.refName}=${altAutosParent.refid}`
               : ""
-          }${altAutos.amountName ? `&${altAutos.amountName}=${amount}` : ""}${
-            altAutos.networkName
+            }${altAutos.amountName ? `&${altAutos.amountName}=${amount}` : ""}${altAutos.networkName
               ? `&${altAutos.networkName}=${pack.autoNetwork}`
               : ""
-          }${altAutos.mobileName ? `&${altAutos.mobileName}=${mobile}` : ""}`;
+            }${altAutos.mobileName ? `&${altAutos.mobileName}=${mobile}` : ""}`;
 
           // test for all request cases that matches
           if (altAutos.method === "GET" && altAutos.format === "HEAD") {
@@ -689,9 +695,8 @@ exports.AirtimeBill = async (req, res) => {
           }
           const date = new Date();
           // const note = `${pack.title} Purchase Successful to ${mobile},  [You have successfull shared ${pack.title} Airtime to ${mobile}.]`;
-      const note = `${pack.title} Purchase Successful to ${mobile} - [${
-        result.data.message || result.data.msg || result.data.api_response
-      }]`;
+          const note = `${pack.title} Purchase Successful to ${mobile} - [${result.data.message || result.data.msg || result.data.api_response || result.data.data.server_message
+            }]`;
           const failnote = `Unable to purchase ${service.network} ${pack.title} airtime plan to ${mobile}`;
           const txid = `TXID_${otpGenerator.generate(5, {
             digits: true,
@@ -701,9 +706,9 @@ exports.AirtimeBill = async (req, res) => {
           })}${date.getTime()}`;
           const errmsg = `Transaction Not Successful`;
           const title = "airtime purchase";
-          const adminnote = `${pack.title} Purchase Successful to ${mobile} - [${
-            result.data.message || result.data.msg || result.data.api_response
-          }]`;
+          const adminnote = `${pack.title} Purchase Successful to ${mobile} - [${result.data.message || result.data.msg || result.data.api_response ||
+            result.data.data.server_message
+            }]`;
 
           console.log(
             "zoned",
@@ -719,7 +724,8 @@ exports.AirtimeBill = async (req, res) => {
             result.data.status_code === "200" ||
             result.data.code === "200" ||
             result.data.status === "success" ||
-            result.data.Status === "successful"
+            result.data.Status === "successful" ||
+            result.data.data.status === true
           ) {
             //deduct from user balance
             user.prevbalance = user.balance;
@@ -735,6 +741,7 @@ exports.AirtimeBill = async (req, res) => {
               status: "success",
               prevbal: user.prevbalance,
               currbal: user.balance,
+              service: service.id,
               title,
             };
             const withd = await Withdraw.create(newWithData);
@@ -749,6 +756,7 @@ exports.AirtimeBill = async (req, res) => {
               status: "success",
               prevbal: user.prevbalance,
               currbal: user.balance,
+              service: service.id,
               title,
             };
             await Transaction.create(newtrans);
@@ -763,6 +771,7 @@ exports.AirtimeBill = async (req, res) => {
               status: "success",
               prevbal: user.prevbalance,
               currbal: user.balance,
+              service: service.id,
               title,
             };
             await Admintransaction.create(adminnewtrans);
@@ -782,6 +791,7 @@ exports.AirtimeBill = async (req, res) => {
               status: "failed",
               prevbal: user.balance,
               currbal: user.balance,
+              service: service.id,
               title,
             };
             const withd = await Withdraw.create(newWithData);
@@ -796,6 +806,7 @@ exports.AirtimeBill = async (req, res) => {
               status: "failed",
               prevbal: user.balance,
               currbal: user.balance,
+              service: service.id,
               title,
             };
             await Transaction.create(newtrans);
@@ -810,6 +821,7 @@ exports.AirtimeBill = async (req, res) => {
               status: "failed",
               prevbal: user.balance,
               currbal: user.balance,
+              service: service.id,
               title,
             };
             await Admintransaction.create(adminnewtrans);
@@ -827,6 +839,7 @@ exports.AirtimeBill = async (req, res) => {
             status: "failed",
             prevbal: user.balance,
             currbal: user.balance,
+            service: service.id,
             title,
           };
           const withd = await Withdraw.create(newWithData);
@@ -841,6 +854,7 @@ exports.AirtimeBill = async (req, res) => {
             status: "failed",
             prevbal: user.balance,
             currbal: user.balance,
+            service: service.id,
             title,
           };
           await Transaction.create(newtrans);
@@ -855,6 +869,7 @@ exports.AirtimeBill = async (req, res) => {
             status: "failed",
             prevbal: user.balance,
             currbal: user.balance,
+            service: service.id,
             title,
           };
           await Admintransaction.create(adminnewtrans);
@@ -866,6 +881,7 @@ exports.AirtimeBill = async (req, res) => {
     ServerError(res, error);
   }
 };
+
 
 // cable data setting
 exports.CableBill = async (req, res) => {
@@ -885,6 +901,9 @@ exports.CableBill = async (req, res) => {
     const pack = await Subscriptiondata.findOne({ where: { id: plan } });
     if (!pack) return res.json({ status: 400, msg: `Package Not Found` });
 
+    const level = await Level.findOne({ where: { id: user.level } })
+    const levelPack = await Levelpack.findOne({ where: { level: level.id, pack: plan } })
+
     // check if transaction pin matches
     if (pin !== user.datapin)
       return res.json({ status: 400, msg: `Invalid Transaction Pin detected` });
@@ -893,9 +912,9 @@ exports.CableBill = async (req, res) => {
     if (user.balance < pack.price)
       return res.json({ status: 400, msg: `Insufficient Balance` });
 
-      // fetch APiPlan
-      const Apis = await Apiplan.findOne({where: {pack: pack.id}})
-      if(!Apis) return res.json({status: 400, msg: `Something went wrong`})
+    // fetch APiPlan
+    const Apis = await Apiplan.findOne({ where: { pack: pack.id } })
+    if (!Apis) return res.json({ status: 400, msg: `Something went wrong` })
     // check if there is an automation service connected to the package
     const autos = await Cable.findOne({
       where: { id: pack.automation },
@@ -923,16 +942,14 @@ exports.CableBill = async (req, res) => {
       const url = `${autosParent.apiurl}${endpoint.title}`;
       const postFormdata = {
         [autosParent.tokenName]: autosParent.token,
-        [autos.servcieName]: service.network,
+        [autos.serviceName]: service.network,
         [autos.decoderName]: iuc,
         [autos.planName]: Apis.plan,
       };
 
-      const getFormdata = `${url}?${autosParent?.tokenName}=${
-        autosParent.token
-      }${autos.serviceName ? `&${autos.serviceName}=${service.network}` : ""}${
-        autos.planName ? `&${autos.planName}=${Apis.plan}` : ""
-      }${autos.decoderName ? `&${autos.decoderName}=${iuc}` : ""}`;
+      const getFormdata = `${url}?${autosParent?.tokenName}=${autosParent.token
+        }${autos.serviceName ? `&${autos.serviceName}=${service.network}` : ""}${autos.planName ? `&${autos.planName}=${Apis.plan}` : ""
+        }${autos.decoderName ? `&${autos.decoderName}=${iuc}` : ""}`;
 
       // test for all request cases that matches
       if (autos.method === "GET" && autos.format === "HEAD") {
@@ -948,9 +965,8 @@ exports.CableBill = async (req, res) => {
       }
       const date = new Date();
       // const note = `${pack.title} Purchase Successful to ${iuc}.`;
-      const note = `${pack.title} Purchase Successful to ${iuc}. - [${
-        result.data.message || result.data.msg || result.data.api_response
-      }]`;
+      const note = `${pack.title} Purchase Successful to ${iuc}. - [${result.data.message || result.data.msg || result.data.api_response || result.data.data.server_message
+        }]`;
       const failnote = `Unable to purchase ${service.network} ${pack.title} cable plan to ${iuc}`;
       const txid = `TXID_${otpGenerator.generate(5, {
         digits: true,
@@ -960,9 +976,8 @@ exports.CableBill = async (req, res) => {
       })}${date.getTime()}`;
       const errmsg = `Transaction Not Successful`;
       const title = "cable purchase";
-      const adminnote = `${pack.title} Purchase Successful to ${iuc}. - [${
-        result.data.message || result.data.msg || result.data.api_response
-      }]`;
+      const adminnote = `${pack.title} Purchase Successful to ${iuc}. - [${result.data.message || result.data.msg || result.data.api_response || result.data.data.server_message
+        }]`;
 
       console.log(
         "zoned",
@@ -979,22 +994,25 @@ exports.CableBill = async (req, res) => {
         result.data.status_code === "200" ||
         result.data.code === "200" ||
         result.data.status === "success" ||
-        result.data.Status === "successful"
+        result.data.Status === "successful" ||
+        result.data.data.status === true
       ) {
         //deduct from user balance
         user.prevbalance = user.balance;
-        user.balance = eval(`${user.balance} - ${pack.price}`);
+        user.balance = eval(`${user.balance} - ${levelPack?.pricing ? levelPack.pricing : pack.price}`);
+
 
         await user.save();
         const newWithData = {
           user: user.id,
           autos: autosParent.title,
           note,
-          amount: pack.price,
+          amount: levelPack?.pricing ? levelPack.pricing : pack.price,
           txid,
           status: "success",
           prevbal: user.prevbalance,
           currbal: user.balance,
+          service: service.id,
           title,
         };
         const withd = await Withdraw.create(newWithData);
@@ -1003,12 +1021,13 @@ exports.CableBill = async (req, res) => {
           user: user.id,
           autos: autosParent.title,
           note,
-          amount: pack.price,
+          amount: levelPack?.pricing ? levelPack.pricing : pack.price,
           txid,
           tag: withd.id,
           status: "success",
           prevbal: user.prevbalance,
           currbal: user.balance,
+          service: service.id,
           title,
         };
         await Transaction.create(newtrans);
@@ -1018,11 +1037,12 @@ exports.CableBill = async (req, res) => {
           autos: autosParent.title,
           note: adminnote,
           txid,
-          amount: pack.price,
+          amount: levelPack?.pricing ? levelPack.pricing : pack.price,
           tag: withd.id,
           status: "success",
           prevbal: user.prevbalance,
           currbal: user.balance,
+          service: service.id,
           title,
         };
         await Admintransaction.create(adminnewtrans);
@@ -1057,15 +1077,12 @@ exports.CableBill = async (req, res) => {
             [altAutos.planName]: Apis.plan,
           };
 
-          const getFormdata = `${url}?${altAutosParent?.tokenName}=${
-            altAutosParent.token
-          }${
-            altAutos.serviceName
+          const getFormdata = `${url}?${altAutosParent?.tokenName}=${altAutosParent.token
+            }${altAutos.serviceName
               ? `&${altAutos.serviceName}=${service.network}`
               : ""
-          }${
-            altAutos.planName ? `&${altAutos.planName}=${Apis.plan}` : ""
-          }${altAutos.decoderName ? `&${altAutos.decoderName}=${iuc}` : ""}`;
+            }${altAutos.planName ? `&${altAutos.planName}=${Apis.plan}` : ""
+            }${altAutos.decoderName ? `&${altAutos.decoderName}=${iuc}` : ""}`;
 
           // test for all request cases that matches
           if (altAutos.method === "GET" && altAutos.format === "HEAD") {
@@ -1084,9 +1101,8 @@ exports.CableBill = async (req, res) => {
           }
           const date = new Date();
           // const note = `${pack.title} Purchase Successful to ${iuc}.`;
-          const note = `${pack.title} Purchase Successful to ${iuc}. - [${
-            result.data.message || result.data.msg || result.data.api_response
-          }]`;
+          const note = `${pack.title} Purchase Successful to ${iuc}. - [${result.data.message || result.data.msg || result.data.api_response || result.data.data.server_message
+            }]`;
           const failnote = `Unable to purchase ${service.network} ${pack.title} cable plan to ${iuc}`;
           const txid = `TXID_${otpGenerator.generate(5, {
             digits: true,
@@ -1096,9 +1112,8 @@ exports.CableBill = async (req, res) => {
           })}${date.getTime()}`;
           const errmsg = `Transaction Not Successful`;
           const title = "cable purchase";
-          const adminnote = `${pack.title} Purchase Successful to ${iuc}. - [${
-            result.data.message || result.data.msg || result.data.api_response
-          }]`;
+          const adminnote = `${pack.title} Purchase Successful to ${iuc}. - [${result.data.message || result.data.msg || result.data.api_response || result.data.data.server_message
+            }]`;
 
           console.log(
             "zoned",
@@ -1114,22 +1129,24 @@ exports.CableBill = async (req, res) => {
             result.data.status_code === "200" ||
             result.data.code === "200" ||
             result.data.status === "success" ||
-            result.data.Status === "successful"
+            result.data.Status === "successful" ||
+            result.data.data.status === true
           ) {
             //deduct from user balance
             user.prevbalance = user.balance;
-            user.balance = eval(`${user.balance} - ${pack.price}`);
+            user.balance = eval(`${user.balance} - ${levelPack?.pricing ? levelPack.pricing : pack.price}`);
 
             await user.save();
             const newWithData = {
               user: user.id,
               autos: altAutosParent.title,
               note,
-              amount: pack.price,
+              amount: levelPack?.pricing ? levelPack.pricing : pack.price,
               txid,
               status: "success",
               prevbal: user.prevbalance,
               currbal: user.balance,
+              service: service.id,
               title,
             };
             const withd = await Withdraw.create(newWithData);
@@ -1138,12 +1155,13 @@ exports.CableBill = async (req, res) => {
               user: user.id,
               note,
               autos: altAutosParent.title,
-              amount: pack.price,
+              amount: levelPack?.pricing ? levelPack.pricing : pack.price,
               txid,
               tag: withd.id,
               status: "success",
               prevbal: user.prevbalance,
               currbal: user.balance,
+              service: service.id,
               title,
             };
             await Transaction.create(newtrans);
@@ -1153,11 +1171,12 @@ exports.CableBill = async (req, res) => {
               autos: altAutosParent.title,
               note: adminnote,
               txid,
-              amount: pack.price,
+              amount: levelPack?.pricing ? levelPack.pricing : pack.price,
               tag: withd.id,
               status: "success",
               prevbal: user.prevbalance,
               currbal: user.balance,
+              service: service.id,
               title,
             };
             await Admintransaction.create(adminnewtrans);
@@ -1172,11 +1191,12 @@ exports.CableBill = async (req, res) => {
               user: user.id,
               autos: altAutosParent.title,
               note: failnote,
-              amount: pack.price,
+              amount: levelPack?.pricing ? levelPack.pricing : pack.price,
               txid,
               status: "failed",
               prevbal: user.balance,
               currbal: user.balance,
+              service: service.id,
               title,
             };
             const withd = await Withdraw.create(newWithData);
@@ -1185,12 +1205,13 @@ exports.CableBill = async (req, res) => {
               user: user.id,
               autos: altAutosParent.title,
               note: failnote,
-              amount: pack.price,
+              amount: levelPack?.pricing ? levelPack.pricing : pack.price,
               txid,
               tag: withd.id,
               status: "failed",
               prevbal: user.balance,
               currbal: user.balance,
+              service: service.id,
               title,
             };
             await Transaction.create(newtrans);
@@ -1198,13 +1219,14 @@ exports.CableBill = async (req, res) => {
             const adminnewtrans = {
               user: user.id,
               autos: altAutosParent.title,
-              note: `${failnote} - ${adminnote}`,
+              note: `${failnote} - [${result?.data?.desc}]`,
               txid,
-              amount: pack.price,
+              amount: levelPack?.pricing ? levelPack.pricing : pack.price,
               tag: withd.id,
               status: "failed",
               prevbal: user.balance,
               currbal: user.balance,
+              service: service.id,
               title,
             };
             await Admintransaction.create(adminnewtrans);
@@ -1217,11 +1239,12 @@ exports.CableBill = async (req, res) => {
             user: user.id,
             autos: autosParent.title,
             note: failnote,
-            amount: pack.price,
+            amount: levelPack?.pricing ? levelPack.pricing : pack.price,
             txid,
             status: "failed",
             prevbal: user.balance,
             currbal: user.balance,
+            service: service.id,
             title,
           };
           const withd = await Withdraw.create(newWithData);
@@ -1230,12 +1253,13 @@ exports.CableBill = async (req, res) => {
             user: user.id,
             autos: autosParent.title,
             note: failnote,
-            amount: pack.price,
+            amount: levelPack?.pricing ? levelPack.pricing : pack.price,
             txid,
             tag: withd.id,
             status: "failed",
             prevbal: user.balance,
             currbal: user.balance,
+            service: service.id,
             title,
           };
           await Transaction.create(newtrans);
@@ -1243,13 +1267,14 @@ exports.CableBill = async (req, res) => {
           const adminnewtrans = {
             user: user.id,
             autos: autosParent.title,
-            note: `${failnote} - ${adminnote}`,
+            note: `${failnote} - [${result?.data?.desc}]`,
             txid,
-            amount: pack.price,
+            amount: levelPack?.pricing ? levelPack.pricing : pack.price,
             tag: withd.id,
             status: "failed",
             prevbal: user.balance,
             currbal: user.balance,
+            service: service.id,
             title,
           };
           await Admintransaction.create(adminnewtrans);
@@ -1261,6 +1286,8 @@ exports.CableBill = async (req, res) => {
     ServerError(res, error);
   }
 };
+
+
 // verifying cable number
 exports.VerifyIUCNumber = async (req, res) => {
   try {
@@ -1318,11 +1345,9 @@ exports.VerifyIUCNumber = async (req, res) => {
         options = {};
       }
 
-      const getFormdata = `${url}?${autosParent?.tokenName}=${
-        autosParent.token
-      }${autos.serviceName ? `&${autos.serviceName}=${sub.network}` : ""}${
-        autos.decoderName ? `&${autos.decoderName}=${iuc}` : ""
-      }`;
+      const getFormdata = `${url}?${autosParent?.tokenName}=${autosParent.token
+        }${autos.serviceName ? `&${autos.serviceName}=${sub.network}` : ""}${autos.decoderName ? `&${autos.decoderName}=${iuc}` : ""
+        }`;
 
       console.log(
         options,
@@ -1350,7 +1375,7 @@ exports.VerifyIUCNumber = async (req, res) => {
         result.data.code === "200" ||
         result.data.status === "success" ||
         result.data.Status === "successful" ||
-        result.data.status === true
+        result.data.data.status === true
       ) {
         const resultData = result.data.desc;
 
@@ -1395,13 +1420,11 @@ exports.VerifyIUCNumber = async (req, res) => {
             options = {};
           }
 
-          const getFormdata = `${url}?${altAutosParent?.tokenName}=${
-            altAutosParent.token
-          }${
-            altAutos.serviceName
+          const getFormdata = `${url}?${altAutosParent?.tokenName}=${altAutosParent.token
+            }${altAutos.serviceName
               ? `&${altAutos.serviceName}=${sub.network}`
               : ""
-          }${altAutos.decoderName ? `&${altAutos.decoderName}=${iuc}` : ""}`;
+            }${altAutos.decoderName ? `&${altAutos.decoderName}=${iuc}` : ""}`;
 
           console.log(
             options,
@@ -1433,7 +1456,7 @@ exports.VerifyIUCNumber = async (req, res) => {
             result.data.code === "200" ||
             result.data.status === "success" ||
             result.data.Status === "successful" ||
-            result.data.status === true
+            result.data.data.status === true
           ) {
             const resultData = result.data.desc;
 
@@ -1456,6 +1479,8 @@ exports.VerifyIUCNumber = async (req, res) => {
     ServerError(res, error);
   }
 };
+
+
 // electricity setting
 exports.ElectricityBill = async (req, res) => {
   try {
@@ -1464,7 +1489,7 @@ exports.ElectricityBill = async (req, res) => {
       return res.json({ status: 400, msg: `Incomplete Parameters` });
     const user = await User.findByPk(req.user);
     if (!user) return res.json({ status: 400, msg: `User Not Found` });
-
+    const newAmount = parseFloat(amount)
     // check if subscription exists
     const service = await Subscription.findOne({ where: { id: sub } });
     if (!service)
@@ -1473,12 +1498,16 @@ exports.ElectricityBill = async (req, res) => {
     // check is package exists
     const pack = await Subscriptiondata.findOne({ where: { id: serviceType } });
     if (!pack) return res.json({ status: 400, msg: `Package Not Found` });
+
+    const level = await Level.findOne({ where: { id: user.level } })
+    const levelPack = await Levelpack.findOne({ where: { level: level.id, pack: pack.id } })
+
     // check if transaction pin matches
     if (pin !== user.datapin)
       return res.json({ status: 400, msg: `Invalid Transaction Pin detected` });
 
     // check if user has enough balance
-    if (user.balance < amount)
+    if (user.balance < newAmount)
       return res.json({ status: 400, msg: `Insufficient Balance` });
 
     // check if there is an automation service connected to the package
@@ -1510,7 +1539,7 @@ exports.ElectricityBill = async (req, res) => {
         [autos.serviceName]: service.network,
         [autos.meterName]: iuc,
         [autos.serviceTypeName]: pack.title,
-        [autos.amountName]: amount,
+        [autos.amountName]: newAmount,
       };
       let options;
       if (autosParent.auths === "yes") {
@@ -1523,15 +1552,12 @@ exports.ElectricityBill = async (req, res) => {
         options = {};
       }
 
-      const getFormdata = `${url}?${autosParent?.tokenName}=${
-        autosParent.token
-      }${autos.serviceName ? `&${autos.serviceName}=${service.network}` : ""}${
-        autos.meterName ? `&${autos.meterName}=${iuc}` : ""
-      }${
-        autos.serviceTypeName
+      const getFormdata = `${url}?${autosParent?.tokenName}=${autosParent.token
+        }${autos.serviceName ? `&${autos.serviceName}=${service.network}` : ""}${autos.meterName ? `&${autos.meterName}=${iuc}` : ""
+        }${autos.serviceTypeName
           ? `&${autos.serviceTypeName}=${pack.title.toLowerCase()}`
           : ""
-      }${autos.amountName ? `&${autos.amountName}=${amount}` : ""}`;
+        }${autos.amountName ? `&${autos.amountName}=${newAmount}` : ""}`;
 
       // test for all request cases that matches
       if (autos.method === "GET" && autos.format === "HEAD") {
@@ -1547,9 +1573,9 @@ exports.ElectricityBill = async (req, res) => {
       }
       const date = new Date();
       // const note = `${pack.title} Purchase Successful to ${iuc}.`;
-      const note = `${pack.title} Purchase Successful to ${iuc}. - [${
-        result.data.message || result.data.msg || result.data.api_response
-      }]`;
+      const note = `${pack.title} Purchase Successful to ${iuc}. - [${result.data.message || result.data.msg || result.data.api_response ||
+        result.data.data.server_message 
+        }]`;
       const failnote = `Unable to purchase ${service.network} ${pack.title} electricity plan to ${iuc}`;
       const txid = `TXID_${otpGenerator.generate(5, {
         digits: true,
@@ -1559,9 +1585,9 @@ exports.ElectricityBill = async (req, res) => {
       })}${date.getTime()}`;
       const errmsg = `Transaction Not Successful`;
       const title = "electricity purchase";
-      const adminnote = `${pack.title} Purchase Successful to ${iuc}. - [${
-        result.data.message || result.data.msg || result.data.api_response
-      }]`;
+      const adminnote = `${pack.title} Purchase Successful to ${iuc}. - [${result.data.message || result.data.msg || result.data.api_response ||
+        result.data.data.server_message
+        }]`;
 
       console.log(
         "zoned",
@@ -1578,22 +1604,24 @@ exports.ElectricityBill = async (req, res) => {
         result.data.status_code === "200" ||
         result.data.code === "200" ||
         result.data.status === "success" ||
-        result.data.Status === "successful"
+        result.data.Status === "successful" ||
+        result.data.data.status === true
       ) {
         //deduct from user balance
         user.prevbalance = user.balance;
-        user.balance = eval(`${user.balance} - ${amount}`);
+        user.balance = eval(`${user.balance} - ${newAmount}`);
 
         await user.save();
         const newWithData = {
           user: user.id,
           autos: autosParent.title,
           note,
-          amount: amount,
+          amount: newAmount,
           txid,
           status: "success",
           prevbal: user.prevbalance,
           currbal: user.balance,
+          service: service.id,
           title,
         };
         const withd = await Withdraw.create(newWithData);
@@ -1602,12 +1630,13 @@ exports.ElectricityBill = async (req, res) => {
           user: user.id,
           autos: autosParent.title,
           note,
-          amount: amount,
+          amount: newAmount,
           txid,
           tag: withd.id,
           status: "success",
           prevbal: user.prevbalance,
           currbal: user.balance,
+          service: service.id,
           title,
         };
         await Transaction.create(newtrans);
@@ -1617,11 +1646,12 @@ exports.ElectricityBill = async (req, res) => {
           autos: autosParent.title,
           note: adminnote,
           txid,
-          amount: amount,
+          amount: newAmount,
           tag: withd.id,
           status: "success",
           prevbal: user.prevbalance,
           currbal: user.balance,
+          service: service.id,
           title,
         };
         await Admintransaction.create(adminnewtrans);
@@ -1656,7 +1686,7 @@ exports.ElectricityBill = async (req, res) => {
             [altAutos.serviceName]: service.network,
             [altAutos.meterName]: iuc,
             [altAutos.serviceTypeName]: pack.title,
-            [altAutos.amountName]: amount,
+            [altAutos.amountName]: newAmount,
           };
           let options;
           if (altAutosParent.auths === "yes") {
@@ -1669,17 +1699,14 @@ exports.ElectricityBill = async (req, res) => {
             options = {};
           }
 
-          const getFormdata = `${url}?${altAutosParent?.tokenName}=${
-            altAutosParent.token
-          }${
-            altAutos.serviceName
+          const getFormdata = `${url}?${altAutosParent?.tokenName}=${altAutosParent.token
+            }${altAutos.serviceName
               ? `&${altAutos.serviceName}=${service.network}`
               : ""
-          }${altAutos.meterName ? `&${altAutos.meterName}=${iuc}` : ""}${
-            altAutos.serviceTypeName
+            }${altAutos.meterName ? `&${altAutos.meterName}=${iuc}` : ""}${altAutos.serviceTypeName
               ? `&${altAutos.serviceTypeName}=${pack.title.toLowerCase()}`
               : ""
-          }${altAutos.amountName ? `&${altAutos.amountName}=${amount}` : ""}`;
+            }${altAutos.amountName ? `&${altAutos.amountName}=${newAmount}` : ""}`;
 
           // test for all request cases that matches
           if (altAutos.method === "GET" && altAutos.format === "HEAD") {
@@ -1698,9 +1725,9 @@ exports.ElectricityBill = async (req, res) => {
           }
           const date = new Date();
           // const note = `${pack.title} Purchase Successful to ${iuc}.`;
-          const note = `${pack.title} Purchase Successful to ${iuc}. - [${
-            result.data.message || result.data.msg || result.data.api_response
-          }]`;
+          const note = `${pack.title} Purchase Successful to ${iuc}. - [${result.data.message || result.data.msg || result.data.api_response || 
+            result.data.data.server_message 
+            }]`;
           const failnote = `Unable to purchase ${service.network} ${pack.title} electricity plan to ${iuc}`;
           const txid = `TXID_${otpGenerator.generate(5, {
             digits: true,
@@ -1710,9 +1737,9 @@ exports.ElectricityBill = async (req, res) => {
           })}${date.getTime()}`;
           const errmsg = `Transaction Not Successful`;
           const title = "electricity purchase";
-          const adminnote = `${pack.title} Purchase Successful to ${iuc}. - [${
-            result.data.message || result.data.msg || result.data.api_response
-          }]`;
+          const adminnote = `${pack.title} Purchase Successful to ${iuc}. - [${result.data.message || result.data.msg || result.data.api_response ||
+            result.data.data.server_message 
+            }]`;
 
           console.log(
             "zoned",
@@ -1728,22 +1755,24 @@ exports.ElectricityBill = async (req, res) => {
             result.data.status_code === "200" ||
             result.data.code === "200" ||
             result.data.status === "success" ||
-            result.data.Status === "successful"
+            result.data.Status === "successful" ||
+            result.data.data.status === true
           ) {
             //deduct from user balance
             user.prevbalance = user.balance;
-            user.balance = eval(`${user.balance} - ${amount}`);
+            user.balance = eval(`${user.balance} - ${newAmount}`);
 
             await user.save();
             const newWithData = {
               user: user.id,
               autos: altAutosParent.title,
               note,
-              amount: amount,
+              amount: newAmount,
               txid,
               status: "success",
               prevbal: user.prevbalance,
               currbal: user.balance,
+              service: service.id,
               title,
             };
             const withd = await Withdraw.create(newWithData);
@@ -1752,12 +1781,13 @@ exports.ElectricityBill = async (req, res) => {
               user: user.id,
               note,
               autos: altAutosParent.title,
-              amount: amount,
+              amount: newAmount,
               txid,
               tag: withd.id,
               status: "success",
               prevbal: user.prevbalance,
               currbal: user.balance,
+              service: service.id,
               title,
             };
             await Transaction.create(newtrans);
@@ -1767,11 +1797,12 @@ exports.ElectricityBill = async (req, res) => {
               autos: altAutosParent.title,
               note: adminnote,
               txid,
-              amount: amount,
+              amount: newAmount,
               tag: withd.id,
               status: "success",
               prevbal: user.prevbalance,
               currbal: user.balance,
+              service: service.id,
               title,
             };
             await Admintransaction.create(adminnewtrans);
@@ -1786,11 +1817,12 @@ exports.ElectricityBill = async (req, res) => {
               user: user.id,
               autos: altAutosParent.title,
               note: failnote,
-              amount: amount,
+              amount: newAmount,
               txid,
               status: "failed",
               prevbal: user.balance,
               currbal: user.balance,
+              service: service.id,
               title,
             };
             const withd = await Withdraw.create(newWithData);
@@ -1799,12 +1831,13 @@ exports.ElectricityBill = async (req, res) => {
               user: user.id,
               autos: altAutosParent.title,
               note: failnote,
-              amount: amount,
+              amount: newAmount,
               txid,
               tag: withd.id,
               status: "failed",
               prevbal: user.balance,
               currbal: user.balance,
+              service: service.id,
               title,
             };
             await Transaction.create(newtrans);
@@ -1814,11 +1847,12 @@ exports.ElectricityBill = async (req, res) => {
               autos: altAutosParent.title,
               note: `${failnote} - ${adminnote}`,
               txid,
-              amount: amount,
+              amount: newAmount,
               tag: withd.id,
               status: "failed",
               prevbal: user.balance,
               currbal: user.balance,
+              service: service.id,
               title,
             };
             await Admintransaction.create(adminnewtrans);
@@ -1831,11 +1865,12 @@ exports.ElectricityBill = async (req, res) => {
             user: user.id,
             autos: autosParent.title,
             note: failnote,
-            amount: amount,
+            amount: newAmount,
             txid,
             status: "failed",
             prevbal: user.balance,
             currbal: user.balance,
+            service: service.id,
             title,
           };
           const withd = await Withdraw.create(newWithData);
@@ -1844,12 +1879,13 @@ exports.ElectricityBill = async (req, res) => {
             user: user.id,
             autos: autosParent.title,
             note: failnote,
-            amount: amount,
+            amount: newAmount,
             txid,
             tag: withd.id,
             status: "failed",
             prevbal: user.balance,
             currbal: user.balance,
+            service: service.id,
             title,
           };
           await Transaction.create(newtrans);
@@ -1859,11 +1895,12 @@ exports.ElectricityBill = async (req, res) => {
             autos: autosParent.title,
             note: `${failnote} - ${adminnote}`,
             txid,
-            amount: amount,
+            amount: newAmount,
             tag: withd.id,
             status: "failed",
             prevbal: user.balance,
             currbal: user.balance,
+            service: service.id,
             title,
           };
           await Admintransaction.create(adminnewtrans);
@@ -1875,6 +1912,8 @@ exports.ElectricityBill = async (req, res) => {
     ServerError(res, error);
   }
 };
+
+
 // verifying electricity number
 exports.VerifyMeterNumber = async (req, res) => {
   try {
@@ -1929,15 +1968,12 @@ exports.VerifyMeterNumber = async (req, res) => {
         options = {};
       }
 
-      const getFormdata = `${url}?${autosParent?.tokenName}=${
-        autosParent.token
-      }${autos.serviceName ? `&${autos.serviceName}=${sub.network}` : ""}${
-        autos.meterName ? `&${autos.meterName}=${iuc}` : ""
-      }${
-        autos.serviceTypeName
+      const getFormdata = `${url}?${autosParent?.tokenName}=${autosParent.token
+        }${autos.serviceName ? `&${autos.serviceName}=${sub.network}` : ""}${autos.meterName ? `&${autos.meterName}=${iuc}` : ""
+        }${autos.serviceTypeName
           ? `&${autos.serviceTypeName}=${subdata.title.toLowerCase()}`
           : ""
-      }`;
+        }`;
 
       console.log(
         options,
@@ -1959,7 +1995,7 @@ exports.VerifyMeterNumber = async (req, res) => {
       } else {
         return res.json({ status: 400, msg: `Provide a valid Api Service` });
       }
-      
+
       // if all is good move forward else move to the second api service
       if (
         result.data.status_code === "200" ||
@@ -2012,17 +2048,14 @@ exports.VerifyMeterNumber = async (req, res) => {
             options = {};
           }
 
-          const getFormdata = `${url}?${altAutosParent?.tokenName}=${
-            altAutosParent.token
-          }${
-            altAutos.serviceName
+          const getFormdata = `${url}?${altAutosParent?.tokenName}=${altAutosParent.token
+            }${altAutos.serviceName
               ? `&${altAutos.serviceName}=${sub.network}`
               : ""
-          }${altAutos.meterName ? `&${altAutos.meterName}=${iuc}` : ""}${
-            altAutos.serviceTypeName
+            }${altAutos.meterName ? `&${altAutos.meterName}=${iuc}` : ""}${altAutos.serviceTypeName
               ? `&${altAutos.serviceTypeName}=${subdata.title.toLowerCase()}`
               : ""
-          }`;
+            }`;
 
           console.log(
             options,
@@ -2078,6 +2111,8 @@ exports.VerifyMeterNumber = async (req, res) => {
   }
 };
 // 45700848851
+
+
 // exam setting
 exports.ExamBill = async (req, res) => {
   try {
@@ -2095,6 +2130,10 @@ exports.ExamBill = async (req, res) => {
     // check is package exists
     const pack = await Subscriptiondata.findOne({ where: { id: sub } });
     if (!pack) return res.json({ status: 400, msg: `Package Not Found` });
+
+    const level = await Level.findOne({ where: { id: user.level } })
+    const levelPack = await Levelpack.findOne({ where: { level: level.id, pack: pack.id } })
+
     // check if transaction pin matches
     if (pin !== user.datapin)
       return res.json({ status: 400, msg: `Invalid Transaction Pin detected` });
@@ -2134,11 +2173,9 @@ exports.ExamBill = async (req, res) => {
         [autos.variationName]: variation,
       };
 
-      const getFormdata = `${url}?${autosParent?.tokenName}=${
-        autosParent.token
-      }${autos.serviceName ? `&${autos.serviceName}=${pack.title}` : ""}${
-        autos.variationName ? `&${autos.variationName}=${variation}` : ""
-      }${autos.mobileName ? `&${autos.mobileName}=${mobile}` : ""}`;
+      const getFormdata = `${url}?${autosParent?.tokenName}=${autosParent.token
+        }${autos.serviceName ? `&${autos.serviceName}=${pack.title}` : ""}${autos.variationName ? `&${autos.variationName}=${variation}` : ""
+        }${autos.mobileName ? `&${autos.mobileName}=${mobile}` : ""}`;
 
       // test for all request cases that matches
       if (autos.method === "GET" && autos.format === "HEAD") {
@@ -2154,9 +2191,9 @@ exports.ExamBill = async (req, res) => {
       }
       const date = new Date();
       // const note = `${pack.title} Purchase Successful to ${mobile}.`;
-      const note = `${pack.title} Purchase Successful to ${mobile}. - [${
-        result.data.message || result.data.msg || result.data.api_response
-      }]`;
+      const note = `${pack.title} Purchase Successful to ${mobile}. - [${result.data.message || result.data.msg || result.data.api_response ||
+        result.data.data.server_message 
+        }]`;
       const failnote = `Unable to purchase ${pack.title} exam plan to ${mobile}`;
       const txid = `TXID_${otpGenerator.generate(5, {
         digits: true,
@@ -2166,9 +2203,9 @@ exports.ExamBill = async (req, res) => {
       })}${date.getTime()}`;
       const errmsg = `Transaction Not Successful`;
       const title = "exam purchase";
-      const adminnote = `${pack.title} Purchase Successful to ${mobile}. - [${
-        result.data.message || result.data.msg || result.data.api_response
-      }]`;
+      const adminnote = `${pack.title} Purchase Successful to ${mobile}. - [${result.data.message || result.data.msg || result.data.api_response ||
+        result.data.data.server_message 
+        }]`;
 
       console.log(
         "zoned",
@@ -2185,18 +2222,20 @@ exports.ExamBill = async (req, res) => {
         result.data.status_code === "200" ||
         result.data.code === "200" ||
         result.data.status === "success" ||
-        result.data.Status === "successful"
+        result.data.Status === "successful" ||
+        result.data.data.status === true
       ) {
         //deduct from user balance
         user.prevbalance = user.balance;
-        user.balance = eval(`${user.balance} - ${pack.price}`);
+        user.balance = eval(`${user.balance} - ${levelPack?.pricing ? levelPack.pricing : pack.price}`);
+
 
         await user.save();
         const newWithData = {
           user: user.id,
           autos: autosParent.title,
           note,
-          amount: pack.price,
+          amount: levelPack?.pricing ? levelPack.pricing : pack.price,
           txid,
           status: "success",
           prevbal: user.prevbalance,
@@ -2209,7 +2248,7 @@ exports.ExamBill = async (req, res) => {
           user: user.id,
           autos: autosParent.title,
           note,
-          amount: pack.price,
+          amount: levelPack?.pricing ? levelPack.pricing : pack.price,
           txid,
           tag: withd.id,
           status: "success",
@@ -2224,7 +2263,7 @@ exports.ExamBill = async (req, res) => {
           autos: autosParent.title,
           note: adminnote,
           txid,
-          amount: pack.price,
+          amount: levelPack?.pricing ? levelPack.pricing : pack.price,
           tag: withd.id,
           status: "success",
           prevbal: user.prevbalance,
@@ -2263,15 +2302,12 @@ exports.ExamBill = async (req, res) => {
             [altAutos.variationName]: variation,
           };
 
-          const getFormdata = `${url}?${altAutosParent?.tokenName}=${
-            altAutosParent.token
-          }${
-            altAutos.serviceName ? `&${altAutos.serviceName}=${pack.title}` : ""
-          }${
-            altAutos.variationName
+          const getFormdata = `${url}?${altAutosParent?.tokenName}=${altAutosParent.token
+            }${altAutos.serviceName ? `&${altAutos.serviceName}=${pack.title}` : ""
+            }${altAutos.variationName
               ? `&${altAutos.variationName}=${variation}`
               : ""
-          }${altAutos.mobileName ? `&${altAutos.mobileName}=${mobile}` : ""}`;
+            }${altAutos.mobileName ? `&${altAutos.mobileName}=${mobile}` : ""}`;
 
           // test for all request cases that matches
           if (altAutos.method === "GET" && altAutos.format === "HEAD") {
@@ -2290,9 +2326,9 @@ exports.ExamBill = async (req, res) => {
           }
           const date = new Date();
           // const note = `${pack.title} Purchase Successful to ${iuc}.`;
-          const note = `${pack.title} Purchase Successful to ${iuc}. - [${
-            result.data.message || result.data.msg || result.data.api_response
-          }]`;
+          const note = `${pack.title} Purchase Successful to ${iuc}. - [${result.data.message || result.data.msg || result.data.api_response ||
+            result.data.data.server_message
+            }]`;
           const failnote = `Unable to purchase ${pack.title} exam plan to ${iuc}`;
           const txid = `TXID_${otpGenerator.generate(5, {
             digits: true,
@@ -2302,9 +2338,9 @@ exports.ExamBill = async (req, res) => {
           })}${date.getTime()}`;
           const errmsg = `Transaction Not Successful`;
           const title = "exam purchase";
-          const adminnote = `${pack.title} Purchase Successful to ${iuc}. - [${
-            result.data.message || result.data.msg || result.data.api_response
-          }]`;
+          const adminnote = `${pack.title} Purchase Successful to ${iuc}. - [${result.data.message || result.data.msg || result.data.api_response ||
+            result.data.data.server_message 
+            }]`;
 
           console.log(
             "zoned",
@@ -2320,18 +2356,19 @@ exports.ExamBill = async (req, res) => {
             result.data.status_code === "200" ||
             result.data.code === "200" ||
             result.data.status === "success" ||
-            result.data.Status === "successful"
+            result.data.Status === "successful" ||
+            result.data.data.status === true
           ) {
             //deduct from user balance
             user.prevbalance = user.balance;
-            user.balance = eval(`${user.balance} - ${pack.price}`);
+            user.balance = eval(`${user.balance} - ${levelPack?.pricing ? levelPack.pricing : pack.price}`);
 
             await user.save();
             const newWithData = {
               user: user.id,
               autos: altAutosParent.title,
               note,
-              amount: pack.price,
+              amount: levelPack?.pricing ? levelPack.pricing : pack.price,
               txid,
               status: "success",
               prevbal: user.prevbalance,
@@ -2344,7 +2381,7 @@ exports.ExamBill = async (req, res) => {
               user: user.id,
               note,
               autos: altAutosParent.title,
-              amount: pack.price,
+              amount: levelPack?.pricing ? levelPack.pricing : pack.price,
               txid,
               tag: withd.id,
               status: "success",
@@ -2359,7 +2396,7 @@ exports.ExamBill = async (req, res) => {
               autos: altAutosParent.title,
               note: adminnote,
               txid,
-              amount: pack.price,
+              amount: levelPack?.pricing ? levelPack.pricing : pack.price,
               tag: withd.id,
               status: "success",
               prevbal: user.prevbalance,
@@ -2378,7 +2415,7 @@ exports.ExamBill = async (req, res) => {
               user: user.id,
               autos: altAutosParent.title,
               note: failnote,
-              amount: pack.price,
+              amount: levelPack?.pricing ? levelPack.pricing : pack.price,
               txid,
               status: "failed",
               prevbal: user.balance,
@@ -2391,7 +2428,7 @@ exports.ExamBill = async (req, res) => {
               user: user.id,
               autos: altAutosParent.title,
               note: failnote,
-              amount: pack.price,
+              amount: levelPack?.pricing ? levelPack.pricing : pack.price,
               txid,
               tag: withd.id,
               status: "failed",
@@ -2406,7 +2443,7 @@ exports.ExamBill = async (req, res) => {
               autos: altAutosParent.title,
               note: `${failnote} - ${adminnote}`,
               txid,
-              amount: pack.price,
+              amount: levelPack?.pricing ? levelPack.pricing : pack.price,
               tag: withd.id,
               status: "failed",
               prevbal: user.balance,
@@ -2423,7 +2460,7 @@ exports.ExamBill = async (req, res) => {
             user: user.id,
             autos: autosParent.title,
             note: failnote,
-            amount: pack.price,
+            amount: levelPack?.pricing ? levelPack.pricing : pack.price,
             txid,
             status: "failed",
             prevbal: user.balance,
@@ -2436,7 +2473,7 @@ exports.ExamBill = async (req, res) => {
             user: user.id,
             autos: autosParent.title,
             note: failnote,
-            amount: pack.price,
+            amount: levelPack?.pricing ? levelPack.pricing : pack.price,
             txid,
             tag: withd.id,
             status: "failed",
@@ -2451,7 +2488,7 @@ exports.ExamBill = async (req, res) => {
             autos: autosParent.title,
             note: `${failnote} - ${adminnote}`,
             txid,
-            amount: pack.price,
+            amount: levelPack?.pricing ? levelPack.pricing : pack.price,
             tag: withd.id,
             status: "failed",
             prevbal: user.balance,

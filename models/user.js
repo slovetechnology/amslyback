@@ -23,6 +23,10 @@ module.exports = (sequelize, DataTypes) => {
         gender: {type: DataTypes.STRING, allowNull: true},
         idfront: {type: DataTypes.STRING, allowNull: true},
         idback: {type: DataTypes.STRING, allowNull: true},
+        kycnote: {type: DataTypes.STRING, allowNull: true},
+        note: {type: DataTypes.STRING, allowNull: true},
+        maritalStatus: {type: DataTypes.STRING, allowNull: true},
+        kyc: {type: DataTypes.STRING, allowNull: true}, //shows if it nin or voter's card or driver's that was submitted
         verified: {type: DataTypes.STRING},
         pass: {type: DataTypes.STRING},
         password: {type: DataTypes.STRING}
