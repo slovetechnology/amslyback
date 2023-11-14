@@ -48,6 +48,8 @@ db.cables = require('./cable')(sequelize, DataTypes)
 db.electricities = require('./electricity')(sequelize, DataTypes)
 db.exams = require('./exam')(sequelize, DataTypes)
 db.notifies = require('./notify')(sequelize, DataTypes)
+db.emails = require('./emailautomation')(sequelize, DataTypes)
+db.kyclimits = require('./kyclimit')(sequelize, DataTypes)
 
 
 db.sequelize.sync({force: false}).then(() => console.log(`re-sync done`))

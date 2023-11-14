@@ -17,6 +17,7 @@ const axios = require("axios");
 const { ServerError } = require("../config/utils");
 const Level = require('../models').levels
 const Levelpack = require('../models').levelpackages
+const Kyclimit = require('../models').kyclimits
 
 // purchasing data
 exports.DataBills = async (req, res) => {
@@ -591,6 +592,11 @@ exports.AirtimeBill = async (req, res) => {
         "first plight"
       );
       // =================
+      // before proceed check if user verified = false, verified, declined
+      // if user is not verified write code to limit user from purchasing anything above the specified amount
+      if(user.verified !== "verified") {
+      const keeptrack = await Kyclimit
+      }
 
       // if all is good move forward else move to the second api service
       if (
@@ -600,6 +606,8 @@ exports.AirtimeBill = async (req, res) => {
         result.data.Status === "successful" ||
         result.data.data.status === true
       ) {
+        // write code to track kyc limit
+        // kyctrack.create({userid, aAMOUNT, date: moment().format('DD-MM-YYYY')})
         //deduct from user balance
         user.prevbalance = user.balance;
         user.balance = eval(`${user.balance} - ${dataAmount}`);
@@ -727,6 +735,7 @@ exports.AirtimeBill = async (req, res) => {
             result.data.Status === "successful" ||
             result.data.data.status === true
           ) {
+            // add kyc track
             //deduct from user balance
             user.prevbalance = user.balance;
             user.balance = eval(`${user.balance} - ${dataAmount}`);
@@ -1574,7 +1583,7 @@ exports.ElectricityBill = async (req, res) => {
       const date = new Date();
       // const note = `${pack.title} Purchase Successful to ${iuc}.`;
       const note = `${pack.title} Purchase Successful to ${iuc}. - [${result.data.message || result.data.msg || result.data.api_response ||
-        result.data.data.server_message 
+        result.data.data.server_message
         }]`;
       const failnote = `Unable to purchase ${service.network} ${pack.title} electricity plan to ${iuc}`;
       const txid = `TXID_${otpGenerator.generate(5, {
@@ -1725,8 +1734,8 @@ exports.ElectricityBill = async (req, res) => {
           }
           const date = new Date();
           // const note = `${pack.title} Purchase Successful to ${iuc}.`;
-          const note = `${pack.title} Purchase Successful to ${iuc}. - [${result.data.message || result.data.msg || result.data.api_response || 
-            result.data.data.server_message 
+          const note = `${pack.title} Purchase Successful to ${iuc}. - [${result.data.message || result.data.msg || result.data.api_response ||
+            result.data.data.server_message
             }]`;
           const failnote = `Unable to purchase ${service.network} ${pack.title} electricity plan to ${iuc}`;
           const txid = `TXID_${otpGenerator.generate(5, {
@@ -1738,7 +1747,7 @@ exports.ElectricityBill = async (req, res) => {
           const errmsg = `Transaction Not Successful`;
           const title = "electricity purchase";
           const adminnote = `${pack.title} Purchase Successful to ${iuc}. - [${result.data.message || result.data.msg || result.data.api_response ||
-            result.data.data.server_message 
+            result.data.data.server_message
             }]`;
 
           console.log(
@@ -2192,7 +2201,7 @@ exports.ExamBill = async (req, res) => {
       const date = new Date();
       // const note = `${pack.title} Purchase Successful to ${mobile}.`;
       const note = `${pack.title} Purchase Successful to ${mobile}. - [${result.data.message || result.data.msg || result.data.api_response ||
-        result.data.data.server_message 
+        result.data.data.server_message
         }]`;
       const failnote = `Unable to purchase ${pack.title} exam plan to ${mobile}`;
       const txid = `TXID_${otpGenerator.generate(5, {
@@ -2204,7 +2213,7 @@ exports.ExamBill = async (req, res) => {
       const errmsg = `Transaction Not Successful`;
       const title = "exam purchase";
       const adminnote = `${pack.title} Purchase Successful to ${mobile}. - [${result.data.message || result.data.msg || result.data.api_response ||
-        result.data.data.server_message 
+        result.data.data.server_message
         }]`;
 
       console.log(
@@ -2339,7 +2348,7 @@ exports.ExamBill = async (req, res) => {
           const errmsg = `Transaction Not Successful`;
           const title = "exam purchase";
           const adminnote = `${pack.title} Purchase Successful to ${iuc}. - [${result.data.message || result.data.msg || result.data.api_response ||
-            result.data.data.server_message 
+            result.data.data.server_message
             }]`;
 
           console.log(
