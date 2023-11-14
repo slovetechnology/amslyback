@@ -14,9 +14,12 @@ const Apiplan = require("../models").apiplans;
 const slug = require("slug");
 const otpGenerator = require("otp-generator");
 const axios = require("axios");
-const { ServerError } = require("../config/utils");
+const { ServerError, ServerCurrency } = require("../config/utils");
 const Level = require('../models').levels
 const Levelpack = require('../models').levelpackages
+const Kyclimit = require('../models').kyclimits
+const Kyctrack = require('../models').kyctracks
+const moment = require('moment')
 
 // purchasing data
 exports.DataBills = async (req, res) => {
@@ -159,7 +162,7 @@ exports.DataBills = async (req, res) => {
         result.data.code === "200" ||
         result.data.status === "success" ||
         result.data.Status === "successful" ||
-        result.data.data.status === true
+        result.data.status === true
       ) {
         //deduct from user balance
         user.prevbalance = user.balance;
@@ -311,7 +314,7 @@ exports.DataBills = async (req, res) => {
             result.data.code === "200" ||
             result.data.status === "success" ||
             result.data.Status === "successful" ||
-            result.data.data.status === true
+            result.data.status === true
           ) {
             //deduct from user balance
             user.prevbalance = user.balance;
@@ -502,6 +505,8 @@ exports.AirtimeBill = async (req, res) => {
     const autos = await Airtime.findOne({
       where: { id: pack.automation },
     });
+
+
     if (!autos)
       return res.json({
         status: 400,
@@ -591,6 +596,17 @@ exports.AirtimeBill = async (req, res) => {
         "first plight"
       );
       // =================
+      if (user.verified !== "verified") {
+        const kyctrack = await Kyctrack.findAll({ where: { user: user.id } })
+        let kycamount = 0
+        kyctrack.map(ele => {
+          if (date === moment().format('DD-MM-YYYY')) {
+            kycamount += parseInt(ele.amount)
+          }
+        })
+        if (kycamount > 1000) return res.json({ status: 400, msg: `you cannot spend more than per ${ServerCurrency}30 day. Please verify your account to spend more` })
+
+      }
 
       // if all is good move forward else move to the second api service
       if (
@@ -598,8 +614,10 @@ exports.AirtimeBill = async (req, res) => {
         result.data.code === "200" ||
         result.data.status === "success" ||
         result.data.Status === "successful" ||
-        result.data.data.status === true
+        result.data.status === true
       ) {
+        //write code to track kyc limit
+        await Kyctrack.create({ user: user.id, amount: dataAmount, date: moment().format('DD-MM-YYYY') })
         //deduct from user balance
         user.prevbalance = user.balance;
         user.balance = eval(`${user.balance} - ${dataAmount}`);
@@ -718,15 +736,26 @@ exports.AirtimeBill = async (req, res) => {
             postFormdata,
             "second plight"
           );
+          if (user.verified !== "verified") {
+            const kyctrack = await Kyctrack.findAll({ where: { user: user.id } })
+            let kycamount = 0
+            kyctrack.map(ele => {
+              if (date === moment().format('DD-MM-YYYY')) {
+                kycamount += parseInt(ele.amount)
+              }
+            })
+            if (kycamount > 1000) return res.json({ status: 400, msg: `you cannot spend more than per ${ServerCurrency}30 day. Please verify your account to spend more` })
 
+          }
           // test for positivity, if not true then move to email notification
           if (
             result.data.status_code === "200" ||
             result.data.code === "200" ||
             result.data.status === "success" ||
             result.data.Status === "successful" ||
-            result.data.data.status === true
+            result.data.status === true
           ) {
+            await Kyctrack.create({ user: user.id, amount: dataAmount, date: moment().format('DD-MM-YYYY') })
             //deduct from user balance
             user.prevbalance = user.balance;
             user.balance = eval(`${user.balance} - ${dataAmount}`);
@@ -995,7 +1024,7 @@ exports.CableBill = async (req, res) => {
         result.data.code === "200" ||
         result.data.status === "success" ||
         result.data.Status === "successful" ||
-        result.data.data.status === true
+        result.data.status === true
       ) {
         //deduct from user balance
         user.prevbalance = user.balance;
@@ -1130,7 +1159,7 @@ exports.CableBill = async (req, res) => {
             result.data.code === "200" ||
             result.data.status === "success" ||
             result.data.Status === "successful" ||
-            result.data.data.status === true
+            result.data.status === true
           ) {
             //deduct from user balance
             user.prevbalance = user.balance;
@@ -1375,7 +1404,7 @@ exports.VerifyIUCNumber = async (req, res) => {
         result.data.code === "200" ||
         result.data.status === "success" ||
         result.data.Status === "successful" ||
-        result.data.data.status === true
+        result.data.status === true
       ) {
         const resultData = result.data.desc;
 
@@ -1456,7 +1485,7 @@ exports.VerifyIUCNumber = async (req, res) => {
             result.data.code === "200" ||
             result.data.status === "success" ||
             result.data.Status === "successful" ||
-            result.data.data.status === true
+            result.data.status === true
           ) {
             const resultData = result.data.desc;
 
@@ -1574,7 +1603,7 @@ exports.ElectricityBill = async (req, res) => {
       const date = new Date();
       // const note = `${pack.title} Purchase Successful to ${iuc}.`;
       const note = `${pack.title} Purchase Successful to ${iuc}. - [${result.data.message || result.data.msg || result.data.api_response ||
-        result.data.data.server_message 
+        result.data.data.server_message
         }]`;
       const failnote = `Unable to purchase ${service.network} ${pack.title} electricity plan to ${iuc}`;
       const txid = `TXID_${otpGenerator.generate(5, {
@@ -1605,7 +1634,7 @@ exports.ElectricityBill = async (req, res) => {
         result.data.code === "200" ||
         result.data.status === "success" ||
         result.data.Status === "successful" ||
-        result.data.data.status === true
+        result.data.status === true
       ) {
         //deduct from user balance
         user.prevbalance = user.balance;
@@ -1725,8 +1754,8 @@ exports.ElectricityBill = async (req, res) => {
           }
           const date = new Date();
           // const note = `${pack.title} Purchase Successful to ${iuc}.`;
-          const note = `${pack.title} Purchase Successful to ${iuc}. - [${result.data.message || result.data.msg || result.data.api_response || 
-            result.data.data.server_message 
+          const note = `${pack.title} Purchase Successful to ${iuc}. - [${result.data.message || result.data.msg || result.data.api_response ||
+            result.data.data.server_message
             }]`;
           const failnote = `Unable to purchase ${service.network} ${pack.title} electricity plan to ${iuc}`;
           const txid = `TXID_${otpGenerator.generate(5, {
@@ -1738,7 +1767,7 @@ exports.ElectricityBill = async (req, res) => {
           const errmsg = `Transaction Not Successful`;
           const title = "electricity purchase";
           const adminnote = `${pack.title} Purchase Successful to ${iuc}. - [${result.data.message || result.data.msg || result.data.api_response ||
-            result.data.data.server_message 
+            result.data.data.server_message
             }]`;
 
           console.log(
@@ -1756,7 +1785,7 @@ exports.ElectricityBill = async (req, res) => {
             result.data.code === "200" ||
             result.data.status === "success" ||
             result.data.Status === "successful" ||
-            result.data.data.status === true
+            result.data.status === true
           ) {
             //deduct from user balance
             user.prevbalance = user.balance;
@@ -2192,7 +2221,7 @@ exports.ExamBill = async (req, res) => {
       const date = new Date();
       // const note = `${pack.title} Purchase Successful to ${mobile}.`;
       const note = `${pack.title} Purchase Successful to ${mobile}. - [${result.data.message || result.data.msg || result.data.api_response ||
-        result.data.data.server_message 
+        result.data.data.server_message
         }]`;
       const failnote = `Unable to purchase ${pack.title} exam plan to ${mobile}`;
       const txid = `TXID_${otpGenerator.generate(5, {
@@ -2204,7 +2233,7 @@ exports.ExamBill = async (req, res) => {
       const errmsg = `Transaction Not Successful`;
       const title = "exam purchase";
       const adminnote = `${pack.title} Purchase Successful to ${mobile}. - [${result.data.message || result.data.msg || result.data.api_response ||
-        result.data.data.server_message 
+        result.data.data.server_message
         }]`;
 
       console.log(
@@ -2223,7 +2252,7 @@ exports.ExamBill = async (req, res) => {
         result.data.code === "200" ||
         result.data.status === "success" ||
         result.data.Status === "successful" ||
-        result.data.data.status === true
+        result.data.status === true
       ) {
         //deduct from user balance
         user.prevbalance = user.balance;
@@ -2339,7 +2368,7 @@ exports.ExamBill = async (req, res) => {
           const errmsg = `Transaction Not Successful`;
           const title = "exam purchase";
           const adminnote = `${pack.title} Purchase Successful to ${iuc}. - [${result.data.message || result.data.msg || result.data.api_response ||
-            result.data.data.server_message 
+            result.data.data.server_message
             }]`;
 
           console.log(
@@ -2357,7 +2386,7 @@ exports.ExamBill = async (req, res) => {
             result.data.code === "200" ||
             result.data.status === "success" ||
             result.data.Status === "successful" ||
-            result.data.data.status === true
+            result.data.status === true
           ) {
             //deduct from user balance
             user.prevbalance = user.balance;
