@@ -616,21 +616,21 @@ exports.AirtimeBill = async (req, res) => {
       //upline recieves the bonus
       //downline gives out the bonus
 
-      const userupline = await User.findOne({ where: { refid: user.upline } })
-      const findreftrack = await Reftrack.findOne({ where: { downline: user.id, upline: userupline.id} })
+      // const userupline = await User.findOne({ where: { refid: user.upline } })
+      // const findreftrack = await Reftrack.findOne({ where: { downline: user.id, upline: userupline.id} })
 
-      if (findreftrack) {
-        findreftrack.amount += parseInt(dataAmount)
-        await findreftrack.save()
+      // if (findreftrack) {
+      //   findreftrack.amount += parseInt(dataAmount)
+      //   await findreftrack.save()
 
-      }
-      if (userupline) {
-        if (findreftrack) {
-          if (findreftrack.amount >= 100) {
-            userupline.bonus += parseInt(10)
-          }
-        }
-      }
+      // }
+      // if (userupline) {
+      //   if (findreftrack) {
+      //     if (findreftrack.amount >= 100) {
+      //       userupline.bonus += parseInt(10)
+      //     }
+      //   }
+      // }
 
       // if all is good move forward else move to the second api service
       if (
