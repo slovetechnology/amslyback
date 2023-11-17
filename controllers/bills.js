@@ -19,6 +19,7 @@ const Level = require('../models').levels
 const Levelpack = require('../models').levelpackages
 const Kyclimit = require('../models').kyclimits
 const Kyctrack = require('../models').kyctracks
+const Reftrack = require('../models').reftracks
 const moment = require('moment')
 
 // purchasing data
@@ -483,10 +484,12 @@ exports.AirtimeBill = async (req, res) => {
 
     // check if subscription exists
     const service = await Subscription.findOne({ where: { id: sub } });
+
     if (!service)
       return res.json({ status: 400, msg: `Subscription not found` });
 
     // check is package exists
+
     const pack = await Subscriptiondata.findOne({ where: { id: network } });
     if (!pack) return res.json({ status: 400, msg: `Package Not Found` });
 
@@ -513,6 +516,7 @@ exports.AirtimeBill = async (req, res) => {
         msg: "No automation service connected to this package yet",
       });
 
+
     let autosParent, altAutosParent;
     if (autos) {
       autosParent = await Automation.findOne({
@@ -525,6 +529,7 @@ exports.AirtimeBill = async (req, res) => {
     const altAutos = await Automation.findOne({
       where: { id: pack.altAutomation },
     });
+
     if (altAutos) {
       altAutosParent = await Automation.findOne({
         where: { id: altAutos.automation },
@@ -598,6 +603,7 @@ exports.AirtimeBill = async (req, res) => {
       // =================
       if (user.verified !== "verified") {
         const kyctrack = await Kyctrack.findAll({ where: { user: user.id } })
+
         let kycamount = 0
         kyctrack.map(ele => {
           if (date === moment().format('DD-MM-YYYY')) {
@@ -606,6 +612,24 @@ exports.AirtimeBill = async (req, res) => {
         })
         if (kycamount > 1000) return res.json({ status: 400, msg: `you cannot spend more than per ${ServerCurrency}30 day. Please verify your account to spend more` })
 
+      }
+      //upline recieves the bonus
+      //downline gives out the bonus
+
+      const userupline = await User.findOne({ where: { refid: user.upline } })
+      const findreftrack = await Reftrack.findOne({ where: { downline: user.id, upline: userupline.id} })
+
+      if (findreftrack) {
+        findreftrack.amount += parseInt(dataAmount)
+        await findreftrack.save()
+
+      }
+      if (userupline) {
+        if (findreftrack) {
+          if (findreftrack.amount >= 100) {
+            userupline.bonus += parseInt(10)
+          }
+        }
       }
 
       // if all is good move forward else move to the second api service
