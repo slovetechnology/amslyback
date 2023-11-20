@@ -14,10 +14,16 @@ const Apiplan = require("../models").apiplans;
 const slug = require("slug");
 const otpGenerator = require("otp-generator");
 const axios = require("axios");
-const { ServerError } = require("../config/utils");
+const { ServerError, ServerCurrency } = require("../config/utils");
 const Level = require('../models').levels
 const Levelpack = require('../models').levelpackages
 const Kyclimit = require('../models').kyclimits
+<<<<<<< HEAD
+=======
+const Kyctrack = require('../models').kyctracks
+const Reftrack = require('../models').reftracks
+const moment = require('moment')
+>>>>>>> c9d144a9e557136fd6f84fb019a75427e1583e70
 
 // purchasing data
 exports.DataBills = async (req, res) => {
@@ -160,7 +166,7 @@ exports.DataBills = async (req, res) => {
         result.data.code === "200" ||
         result.data.status === "success" ||
         result.data.Status === "successful" ||
-        result.data.data.status === true
+        result.data.status === true
       ) {
         //deduct from user balance
         user.prevbalance = user.balance;
@@ -312,7 +318,7 @@ exports.DataBills = async (req, res) => {
             result.data.code === "200" ||
             result.data.status === "success" ||
             result.data.Status === "successful" ||
-            result.data.data.status === true
+            result.data.status === true
           ) {
             //deduct from user balance
             user.prevbalance = user.balance;
@@ -481,10 +487,12 @@ exports.AirtimeBill = async (req, res) => {
 
     // check if subscription exists
     const service = await Subscription.findOne({ where: { id: sub } });
+
     if (!service)
       return res.json({ status: 400, msg: `Subscription not found` });
 
     // check is package exists
+
     const pack = await Subscriptiondata.findOne({ where: { id: network } });
     if (!pack) return res.json({ status: 400, msg: `Package Not Found` });
 
@@ -503,11 +511,14 @@ exports.AirtimeBill = async (req, res) => {
     const autos = await Airtime.findOne({
       where: { id: pack.automation },
     });
+
+
     if (!autos)
       return res.json({
         status: 400,
         msg: "No automation service connected to this package yet",
       });
+
 
     let autosParent, altAutosParent;
     if (autos) {
@@ -521,6 +532,7 @@ exports.AirtimeBill = async (req, res) => {
     const altAutos = await Automation.findOne({
       where: { id: pack.altAutomation },
     });
+
     if (altAutos) {
       altAutosParent = await Automation.findOne({
         where: { id: altAutos.automation },
@@ -592,12 +604,45 @@ exports.AirtimeBill = async (req, res) => {
         "first plight"
       );
       // =================
+<<<<<<< HEAD
       // before proceed check if user verified = false, verified, declined
       // if user is not verified write code to limit user from purchasing anything above the specified amount
       // const userLimit = 300
       if(user.verified !== "verified") {
       const keeptrack = await Kyclimit
       }
+=======
+      if (user.verified !== "verified") {
+        const kyctrack = await Kyctrack.findAll({ where: { user: user.id } })
+
+        let kycamount = 0
+        kyctrack.map(ele => {
+          if (date === moment().format('DD-MM-YYYY')) {
+            kycamount += parseInt(ele.amount)
+          }
+        })
+        if (kycamount > 1000) return res.json({ status: 400, msg: `you cannot spend more than per ${ServerCurrency}30 day. Please verify your account to spend more` })
+
+      }
+      //upline recieves the bonus
+      //downline gives out the bonus
+
+      // const userupline = await User.findOne({ where: { refid: user.upline } })
+      // const findreftrack = await Reftrack.findOne({ where: { downline: user.id, upline: userupline.id} })
+
+      // if (findreftrack) {
+      //   findreftrack.amount += parseInt(dataAmount)
+      //   await findreftrack.save()
+
+      // }
+      // if (userupline) {
+      //   if (findreftrack) {
+      //     if (findreftrack.amount >= 100) {
+      //       userupline.bonus += parseInt(10)
+      //     }
+      //   }
+      // }
+>>>>>>> c9d144a9e557136fd6f84fb019a75427e1583e70
 
       // if all is good move forward else move to the second api service
       if (
@@ -605,10 +650,15 @@ exports.AirtimeBill = async (req, res) => {
         result.data.code === "200" ||
         result.data.status === "success" ||
         result.data.Status === "successful" ||
-        result.data.data.status === true
+        result.data.status === true
       ) {
+<<<<<<< HEAD
         // write code to track kyc limit
         // kyctrack.create({userid, aAMOUNT, date: moment().format('DD-MM-YYYY')})
+=======
+        //write code to track kyc limit
+        await Kyctrack.create({ user: user.id, amount: dataAmount, date: moment().format('DD-MM-YYYY') })
+>>>>>>> c9d144a9e557136fd6f84fb019a75427e1583e70
         //deduct from user balance
         user.prevbalance = user.balance;
         user.balance = eval(`${user.balance} - ${dataAmount}`);
@@ -727,16 +777,30 @@ exports.AirtimeBill = async (req, res) => {
             postFormdata,
             "second plight"
           );
+          if (user.verified !== "verified") {
+            const kyctrack = await Kyctrack.findAll({ where: { user: user.id } })
+            let kycamount = 0
+            kyctrack.map(ele => {
+              if (date === moment().format('DD-MM-YYYY')) {
+                kycamount += parseInt(ele.amount)
+              }
+            })
+            if (kycamount > 1000) return res.json({ status: 400, msg: `you cannot spend more than per ${ServerCurrency}30 day. Please verify your account to spend more` })
 
+          }
           // test for positivity, if not true then move to email notification
           if (
             result.data.status_code === "200" ||
             result.data.code === "200" ||
             result.data.status === "success" ||
             result.data.Status === "successful" ||
-            result.data.data.status === true
+            result.data.status === true
           ) {
+<<<<<<< HEAD
             // add kyc track
+=======
+            await Kyctrack.create({ user: user.id, amount: dataAmount, date: moment().format('DD-MM-YYYY') })
+>>>>>>> c9d144a9e557136fd6f84fb019a75427e1583e70
             //deduct from user balance
             user.prevbalance = user.balance;
             user.balance = eval(`${user.balance} - ${dataAmount}`);
@@ -1005,7 +1069,7 @@ exports.CableBill = async (req, res) => {
         result.data.code === "200" ||
         result.data.status === "success" ||
         result.data.Status === "successful" ||
-        result.data.data.status === true
+        result.data.status === true
       ) {
         //deduct from user balance
         user.prevbalance = user.balance;
@@ -1140,7 +1204,7 @@ exports.CableBill = async (req, res) => {
             result.data.code === "200" ||
             result.data.status === "success" ||
             result.data.Status === "successful" ||
-            result.data.data.status === true
+            result.data.status === true
           ) {
             //deduct from user balance
             user.prevbalance = user.balance;
@@ -1385,7 +1449,7 @@ exports.VerifyIUCNumber = async (req, res) => {
         result.data.code === "200" ||
         result.data.status === "success" ||
         result.data.Status === "successful" ||
-        result.data.data.status === true
+        result.data.status === true
       ) {
         const resultData = result.data.desc;
 
@@ -1466,7 +1530,7 @@ exports.VerifyIUCNumber = async (req, res) => {
             result.data.code === "200" ||
             result.data.status === "success" ||
             result.data.Status === "successful" ||
-            result.data.data.status === true
+            result.data.status === true
           ) {
             const resultData = result.data.desc;
 
@@ -1615,7 +1679,7 @@ exports.ElectricityBill = async (req, res) => {
         result.data.code === "200" ||
         result.data.status === "success" ||
         result.data.Status === "successful" ||
-        result.data.data.status === true
+        result.data.status === true
       ) {
         //deduct from user balance
         user.prevbalance = user.balance;
@@ -1766,7 +1830,7 @@ exports.ElectricityBill = async (req, res) => {
             result.data.code === "200" ||
             result.data.status === "success" ||
             result.data.Status === "successful" ||
-            result.data.data.status === true
+            result.data.status === true
           ) {
             //deduct from user balance
             user.prevbalance = user.balance;
@@ -2233,7 +2297,7 @@ exports.ExamBill = async (req, res) => {
         result.data.code === "200" ||
         result.data.status === "success" ||
         result.data.Status === "successful" ||
-        result.data.data.status === true
+        result.data.status === true
       ) {
         //deduct from user balance
         user.prevbalance = user.balance;
@@ -2367,7 +2431,7 @@ exports.ExamBill = async (req, res) => {
             result.data.code === "200" ||
             result.data.status === "success" ||
             result.data.Status === "successful" ||
-            result.data.data.status === true
+            result.data.status === true
           ) {
             //deduct from user balance
             user.prevbalance = user.balance;
