@@ -594,6 +594,7 @@ exports.AirtimeBill = async (req, res) => {
       // =================
       // before proceed check if user verified = false, verified, declined
       // if user is not verified write code to limit user from purchasing anything above the specified amount
+      // const userLimit = 300
       if(user.verified !== "verified") {
       const keeptrack = await Kyclimit
       }

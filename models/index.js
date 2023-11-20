@@ -75,6 +75,8 @@ db.electricities.hasMany(db.networks, {foreignKey: 'automation', as: 'elecnetwor
 db.electricities.hasMany(db.apiplans, {foreignKey: 'automation', as: 'elecplans'})
 db.levels.hasMany(db.levelpackages, {foreignKey: 'level', as: 'levelpack'})
 db.levels.hasMany(db.levelsubs, {foreignKey: 'level', as: 'levelsub'})
+db.subscriptions.hasMany(db.levelsubs, {foreignKey: 'sub', as: 'subs'})
+db.subscriptiondata.hasMany(db.levelpackages, {foreignKey: 'pack', as: 'packs'})
 
 // many to one relationships
 db.subscriptiondata.belongsTo(db.subscriptions, {foreignKey: 'network', as: 'sub'});
@@ -98,6 +100,8 @@ db.exams.belongsTo(db.automations, {foreignKey: 'automation', as: 'exams'})
 db.electricities.belongsTo(db.automations, {foreignKey: 'automation', as: 'electricities'})
 db.levelpackages.belongsTo(db.levels, {foreignKey: 'level', as: 'levelpack'})
 db.levelsubs.belongsTo(db.levels, {foreignKey: 'level', as: 'levelsub'})
+db.levelsubs.belongsTo(db.subscriptions, {foreignKey: 'sub', as: 'subs'})
+db.levelpackages.belongsTo(db.subscriptiondata, {foreignKey: 'pack', as: 'packs'})
 
 
 module.exports = db

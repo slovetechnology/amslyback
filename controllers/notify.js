@@ -22,6 +22,7 @@ exports.CreateNotify = async (req, res) => {
     }
 }
 
+
 exports.UpdateNotify = async (req, res) => {
     try {
         const { message, tag, id } = req.body
