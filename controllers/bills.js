@@ -18,12 +18,11 @@ const { ServerError, ServerCurrency } = require("../config/utils");
 const Level = require('../models').levels
 const Levelpack = require('../models').levelpackages
 const Kyclimit = require('../models').kyclimits
-<<<<<<< HEAD
-=======
 const Kyctrack = require('../models').kyctracks
 const Reftrack = require('../models').reftracks
 const moment = require('moment')
->>>>>>> c9d144a9e557136fd6f84fb019a75427e1583e70
+
+
 
 // purchasing data
 exports.DataBills = async (req, res) => {
@@ -604,14 +603,6 @@ exports.AirtimeBill = async (req, res) => {
         "first plight"
       );
       // =================
-<<<<<<< HEAD
-      // before proceed check if user verified = false, verified, declined
-      // if user is not verified write code to limit user from purchasing anything above the specified amount
-      // const userLimit = 300
-      if(user.verified !== "verified") {
-      const keeptrack = await Kyclimit
-      }
-=======
       if (user.verified !== "verified") {
         const kyctrack = await Kyctrack.findAll({ where: { user: user.id } })
 
@@ -642,7 +633,7 @@ exports.AirtimeBill = async (req, res) => {
       //     }
       //   }
       // }
->>>>>>> c9d144a9e557136fd6f84fb019a75427e1583e70
+      
 
       // if all is good move forward else move to the second api service
       if (
@@ -652,13 +643,10 @@ exports.AirtimeBill = async (req, res) => {
         result.data.Status === "successful" ||
         result.data.status === true
       ) {
-<<<<<<< HEAD
-        // write code to track kyc limit
-        // kyctrack.create({userid, aAMOUNT, date: moment().format('DD-MM-YYYY')})
-=======
+        
         //write code to track kyc limit
         await Kyctrack.create({ user: user.id, amount: dataAmount, date: moment().format('DD-MM-YYYY') })
->>>>>>> c9d144a9e557136fd6f84fb019a75427e1583e70
+        
         //deduct from user balance
         user.prevbalance = user.balance;
         user.balance = eval(`${user.balance} - ${dataAmount}`);
@@ -796,11 +784,7 @@ exports.AirtimeBill = async (req, res) => {
             result.data.Status === "successful" ||
             result.data.status === true
           ) {
-<<<<<<< HEAD
-            // add kyc track
-=======
             await Kyctrack.create({ user: user.id, amount: dataAmount, date: moment().format('DD-MM-YYYY') })
->>>>>>> c9d144a9e557136fd6f84fb019a75427e1583e70
             //deduct from user balance
             user.prevbalance = user.balance;
             user.balance = eval(`${user.balance} - ${dataAmount}`);
