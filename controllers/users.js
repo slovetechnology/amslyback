@@ -8,6 +8,9 @@ const Level = require('../models').levels
 const Deposit = require('../models').deposits
 const Automation = require('../models').automations
 const Subscription = require('../models').subscriptions
+const Levelsub = require('../models').levelsubs
+const LevelPackage = require('../models').levelpackages
+const Subscriptiondata = require("../models").subscriptiondata;
 const bcrypt = require('bcryptjs')
 const jwt = require('jsonwebtoken')
 const otpGenerator = require('otp-generator')
@@ -150,9 +153,17 @@ exports.FetchuserAccount = async (req, res) => {
     try {
         const user = await User.findOne({
             where: { id: req.user },
-            attributes: { exclude: ['password'] },
-            include: [{ model: Level, as: 'levels' }]
-        })
+            attributes: { exclude: ['password', 'pass'] },
+            include: [
+            { model: Level, as: 'levels', include: [
+                {model: Levelsub, as: 'levelsub', include: [
+                    {model: Subscription, as: 'subs'}
+                ]},
+                {model: LevelPackage, as: 'levelpack', include: [
+                    {model: Subscriptiondata, as: 'packs'}
+                ]}
+            ] }
+        ]})
         if (!user) return res.json({ status: 400, msg: `User not found` })
         const options = { digits: true, upperCase: true, specialChars: false, lowerCase: false }
         const refData = `REF_${user.firstname.slice(-3)}${otpGenerator.generate(8, { ...options })}${user.lastname.slice(-3)}`

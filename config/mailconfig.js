@@ -3,7 +3,7 @@
 const nodemailer = require('nodemailer')
 const hb = require('nodemailer-express-handlebars')
 
-const mailSender = async (sendTo, subject, template, code, fullname, message) => {
+const MailSender = async ({sendTo, subject, template, code, fullname, message}) => {
     const transporter = nodemailer.createTransport({
         host: MAIL_HOST,
         // host: "smtp.gmail.com",
@@ -42,4 +42,4 @@ const mailSender = async (sendTo, subject, template, code, fullname, message) =>
 
     await transporter.sendMail(mailOptions)
 }
-module.exports = mailSender
+module.exports = MailSender
