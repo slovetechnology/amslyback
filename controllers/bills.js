@@ -22,6 +22,8 @@ const Kyctrack = require('../models').kyctracks
 const Reftrack = require('../models').reftracks
 const moment = require('moment')
 
+
+
 // purchasing data
 exports.DataBills = async (req, res) => {
   try {
@@ -635,6 +637,18 @@ exports.AirtimeBill = async (req, res) => {
       }
 
 
+<<<<<<< HEAD
+=======
+      // }
+      // if (userupline) {
+      //   if (findreftrack) {
+      //     if (findreftrack.amount >= 100) {
+      //       userupline.bonus += parseInt(10)
+      //     }
+      //   }
+      // }
+      
+>>>>>>> 47bd398035e398c110d1e90e1578029be6635945
 
       // if all is good move forward else move to the second api service
       if (
@@ -644,8 +658,10 @@ exports.AirtimeBill = async (req, res) => {
         result.data.Status === "successful" ||
         result.data.status === true
       ) {
+        
         //write code to track kyc limit
         await Kyctrack.create({ user: user.id, amount: dataAmount, date: moment().format('DD-MM-YYYY') })
+        
         //deduct from user balance
         user.prevbalance = user.balance;
         user.balance = eval(`${user.balance} - ${dataAmount}`);
