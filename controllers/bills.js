@@ -637,8 +637,6 @@ exports.AirtimeBill = async (req, res) => {
       }
 
 
-<<<<<<< HEAD
-=======
       // }
       // if (userupline) {
       //   if (findreftrack) {
@@ -648,7 +646,6 @@ exports.AirtimeBill = async (req, res) => {
       //   }
       // }
       
->>>>>>> 47bd398035e398c110d1e90e1578029be6635945
 
       // if all is good move forward else move to the second api service
       if (

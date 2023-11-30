@@ -8,15 +8,9 @@ const Level = require('../models').levels
 const Deposit = require('../models').deposits
 const Automation = require('../models').automations
 const Subscription = require('../models').subscriptions
-<<<<<<< HEAD
-const Subscriptiondata = require('../models').subscriptiondata
-const LevelPackage = require('../models').levelpackages
-const Levelsub = require('../models').levelsubs
-=======
 const Levelsub = require('../models').levelsubs
 const LevelPackage = require('../models').levelpackages
 const Subscriptiondata = require("../models").subscriptiondata;
->>>>>>> 47bd398035e398c110d1e90e1578029be6635945
 const bcrypt = require('bcryptjs')
 const jwt = require('jsonwebtoken')
 const otpGenerator = require('otp-generator')
@@ -173,11 +167,7 @@ exports.FetchuserAccount = async (req, res) => {
                 ]}
             ] }
         ]})
-<<<<<<< HEAD
-        if (!user) return res.json({ status: 400, msg: 'User not found' })
-=======
         if (!user) return res.json({ status: 400, msg: `User not found` })
->>>>>>> 47bd398035e398c110d1e90e1578029be6635945
         const options = { digits: true, upperCase: true, specialChars: false, lowerCase: false }
         const refData = `REF_${user.firstname.slice(-3)}${otpGenerator.generate(8, { ...options })}${user.lastname.slice(-3)}`
 
