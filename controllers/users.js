@@ -175,7 +175,6 @@ exports.FetchuserAccount = async (req, res) => {
             user.refid = refData.toUpperCase()
             await user.save()
         }
-
         const levels = await Level.findAll({})
         return res.json({ status: 200, msg: user, levels });
     } catch (error) {
