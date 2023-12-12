@@ -17,6 +17,7 @@ const axios = require("axios");
 const { ServerError, ServerCurrency } = require("../config/utils");
 const Level = require('../models').levels
 const Levelpack = require('../models').levelpackages
+const LevelSub = require('../models').levelsubs
 const Kyclimit = require('../models').kyclimits
 const Kyctrack = require('../models').kyctracks
 const Reftrack = require('../models').reftracks
@@ -38,19 +39,27 @@ exports.DataBills = async (req, res) => {
     if (!user) return res.json({ status: 400, msg: `User Not Found` });
 
     // check if subscription exists
-    const sub = await Subscription.findOne({ where: { id: network } });
-    if (!sub) return res.json({ status: 400, msg: `Subscription not found` });
+    // const sub = await Subscription.findOne({ where: { id: network } });
+    const getLevelSub = await LevelSub.findOne({
+      where: {sub: network},
+      include: [{model: Subscription, as: 'subs'}]
+    })
+    if (!getLevelSub) return res.json({ status: 400, msg: `Subscription not found` });
+    const sub = getLevelSub.subs
 
     // check is package exists
-    const pack = await Subscriptiondata.findOne({ where: { id: package } });
-    if (!pack) return res.json({ status: 400, msg: `Package Not Found` });
+    // const pack = await Subscriptiondata.findOne({ where: { id: package } });
+    const getLevelPackage = await Levelpack.findOne({
+      where: {id: package},
+      include: [{model: Subscriptiondata, as: 'packs'}]
+    })
+    if (!getLevelPackage) return res.json({ status: 400, msg: `Package Not Found` });
+    const pack = getLevelPackage
 
-    const level = await Level.findOne({ where: { id: user.level } })
-    const levelPack = await Levelpack.findOne({ where: { level: level.id, pack: package } })
 
     // check if there is an automation service connected to the package
     const autos = await Automation.findOne({
-      where: { id: pack.automation },
+      where: { id: pack.packs?.automation },
       include: [{ model: Endpoint, as: "autos" }],
     });
     if (!autos)
@@ -61,7 +70,7 @@ exports.DataBills = async (req, res) => {
 
     // check if there is an alternate automation service standby
     const altAutos = await Automation.findOne({
-      where: { id: pack.altAutomation },
+      where: { id: pack.packs?.altAutomation },
       include: [{ model: Endpoint, as: "autos" }],
     });
 
@@ -70,7 +79,7 @@ exports.DataBills = async (req, res) => {
       return res.json({ status: 400, msg: `Invalid Transaction Pin detected` });
 
     // check if user has enough balance
-    if (user.balance < pack.price)
+    if (user.balance < parseFloat(pack.pricing))
       return res.json({ status: 400, msg: `Insufficient Balance` });
 
     if (autos) {
@@ -82,8 +91,8 @@ exports.DataBills = async (req, res) => {
       const postFormdata = {
         [autos.tokenName]: autos.token,
         [autos.mobileName]: mobile,
-        [autos.planName]: pack.deal,
-        [autos.networkName]: pack.autoNetwork,
+        [autos.planName]: pack.packs?.deal,
+        [autos.networkName]: pack.packs?.autoNetwork,
         [autos.refName]: autos.refid,
         [autos.callbackName]: autos.callback,
         [autos.portedName]: autos.portedNumber === "true" ? true : false,
@@ -100,7 +109,7 @@ exports.DataBills = async (req, res) => {
       }
 
       const getFormdata = `${url}?${autos?.tokenName}=${autos.token}${autos.refName ? `&${autos.refName}=${autos.refid}` : ""
-        }${autos.planName ? `&${autos.planName}=${pack.deal}` : ""}${autos.networkName ? `&${autos.networkName}=${pack.autoNetwork}` : ""
+        }${autos.planName ? `&${autos.planName}=${pack.packs?.deal}` : ""}${autos.networkName ? `&${autos.networkName}=${pack.packs?.autoNetwork}` : ""
         }${autos.mobileName ? `&${autos.mobileName}=${mobile}` : ""}${autos.callbackName ? `&${autos.callbackName}=${autos.callback}` : ""
         }${autos.portedNumber ? `&${autos.portedName}=${autos.portedNumber === "true" ? true : false}` : ""
         }`;
@@ -113,6 +122,7 @@ exports.DataBills = async (req, res) => {
         autos.method,
         autos.format
       );
+      let result;
       // test for all request cases that matches
       if (autos.method === "GET" && autos.format === "HEAD") {
         result = await axios.get(getFormdata, options);
@@ -127,14 +137,14 @@ exports.DataBills = async (req, res) => {
       }
       const date = new Date();
       // const note = `${sub.network} ${pack.title} Purchase Successful to ${mobile},  [You have successfull shared ${pack.title} Data to ${mobile}.]`;
-      const note = `${sub.network} ${pack.title} Purchase Successful to ${mobile} - [${result.data.message ||
+      const note = `${sub.network} ${pack.packs?.title} Purchase Successful to ${mobile} - [${result.data.message ||
         result.data.msg ||
         result.data.api_response ||
         result.data.data.server_message ||
         result.data.data.true_response
         }]`;
 
-      const failnote = `Unable to purchase ${sub.network} ${pack.title} data plan to ${mobile}`;
+      const failnote = `Unable to purchase ${sub.network} ${pack.packs?.title} data plan to ${mobile}`;
       const txid = `TXID_${otpGenerator.generate(5, {
         digits: true,
         specialChars: false,
@@ -143,7 +153,7 @@ exports.DataBills = async (req, res) => {
       })}${date.getTime()}`;
       const errmsg = `Transaction Not Successful`;
       const title = "data purchase";
-      const adminnote = `${sub.network} ${pack.title} Purchase Successful to ${mobile} - [${result.data.message ||
+      const adminnote = `${sub.network} ${pack.packs?.title} Purchase Successful to ${mobile} - [${result.data.message ||
         result.data.msg ||
         result.data.api_response ||
         result.data.data.server_message ||
@@ -169,14 +179,14 @@ exports.DataBills = async (req, res) => {
       ) {
         //deduct from user balance
         user.prevbalance = user.balance;
-        user.balance = eval(`${user.balance} - ${levelPack?.pricing ? levelPack.pricing : pack.price}`);
+        user.balance = eval(`${user.balance} - ${pack.pricing}`);
 
         await user.save();
         const newWithData = {
           user: user.id,
           autos: autos.title,
           note,
-          amount: levelPack?.pricing ? levelPack.pricing : pack.price,
+          amount: pack.pricing,
           txid,
           status: "success",
           prevbal: user.prevbalance,
@@ -190,7 +200,7 @@ exports.DataBills = async (req, res) => {
           user: user.id,
           autos: autos.title,
           note,
-          amount: levelPack?.pricing ? levelPack.pricing : pack.price,
+          amount: pack.pricing,
           txid,
           tag: withd.id,
           status: "success",
@@ -206,7 +216,7 @@ exports.DataBills = async (req, res) => {
           autos: autos.title,
           note: adminnote,
           txid,
-          amount: levelPack?.pricing ? levelPack.pricing : pack.price,
+          amount: pack.pricing,
           tag: withd.id,
           status: "success",
           prevbal: user.prevbalance,
@@ -231,8 +241,8 @@ exports.DataBills = async (req, res) => {
           const altPostFormdata = {
             [altAutos.tokenName]: altAutos.token,
             [altAutos.mobileName]: mobile,
-            [altAutos.planName]: pack.altDeal,
-            [altAutos.networkName]: pack.altAutoNetwork,
+            [altAutos.planName]: pack.packs?.altDeal,
+            [altAutos.networkName]: pack.packs?.altAutoNetwork,
             [altAutos.refName]: altAutos.refid,
             [altAutos.callbackName]: altAutos.callback,
             [altAutos.portedName]: altAutos.portedNumber,
@@ -249,9 +259,9 @@ exports.DataBills = async (req, res) => {
           }
 
           const altGetFormdata = `${altUrl}?${altAutos?.tokenName}=${altAutos.token
-            }${altAutos.refName ? `&${altAutos.refName}=${altAutos.refid}` : ""}${altAutos.planName ? `&${altAutos.planName}=${pack.altDeal}` : ""
+            }${altAutos.refName ? `&${altAutos.refName}=${altAutos.refid}` : ""}${altAutos.planName ? `&${altAutos.planName}=${pack.packs?.altDeal}` : ""
             }${altAutos.networkName
-              ? `&${altAutos.networkName}=${pack.altAutoNetwork}`
+              ? `&${altAutos.networkName}=${pack.packs?.altAutoNetwork}`
               : ""
             }${altAutos.mobileName ? `&${altAutos.mobileName}=${mobile}` : ""}${altAutos.callbackName
               ? `&${altAutos.callbackName}=${altAutos.callback}`
@@ -280,13 +290,13 @@ exports.DataBills = async (req, res) => {
           // result = await axios.post(`https://zoedata.ng/api/v2/datashare/?api_key=6tg7x6CJ1LGKQuuRMTaIGy2MxFKX1oahJNqKZHYyMb8GjkAwGRxUPdPhGTkwV5gtdcwbeWhiKoB5TnqztNV2MbdXXrk3zeWnYEWHQFq2o2GKQdaAwT8moNHfmgEzK7aU&product_code=data_share_1gb&phone=08029706970&callback=https://zoedata.ng/webhook.php`)
           const date = new Date();
           // const note = `${sub.network} ${pack.title} Purchase Successful to ${mobile},  [You have successfull shared ${pack.title} Data to ${mobile}.]`;
-          const note = `${sub.network} ${pack.title} Purchase Successful to ${mobile} - [${result.data.message ||
+          const note = `${sub.network} ${pack.packs?.title} Purchase Successful to ${mobile} - [${result.data.message ||
             result.data.msg ||
             result.data.api_response ||
             result.data.data.server_message ||
             result.data.data.true_response
             }]`;
-          const failnote = `Unable to purchase ${sub.network} ${pack.title} data plan to ${mobile}`;
+          const failnote = `Unable to purchase ${sub.network} ${pack.packs?.title} data plan to ${mobile}`;
           const txid = `TXID_${otpGenerator.generate(5, {
             digits: true,
             specialChars: false,
@@ -295,7 +305,7 @@ exports.DataBills = async (req, res) => {
           })}${date.getTime()}`;
           const errmsg = `Transaction Not Successful`;
           const title = "data purchase";
-          const adminnote = `${sub.network} ${pack.title} Purchase Successful to ${mobile} - [${result.data.message ||
+          const adminnote = `${sub.network} ${pack.packs?.title} Purchase Successful to ${mobile} - [${result.data.message ||
             result.data.msg ||
             result.data.api_response ||
             result.data.data.server_message ||
@@ -321,14 +331,14 @@ exports.DataBills = async (req, res) => {
           ) {
             //deduct from user balance
             user.prevbalance = user.balance;
-            user.balance = eval(`${user.balance} - ${levelPack?.pricing ? levelPack.pricing : pack.price}`);
+            user.balance = eval(`${user.balance} - ${pack.pricing}`);
 
             await user.save();
             const newWithData = {
               user: user.id,
               autos: altAutos.title,
               note,
-              amount: levelPack?.pricing ? levelPack.pricing : pack.price,
+              amount: pack.pricing,
               txid,
               status: "success",
               prevbal: user.prevbalance,
@@ -342,7 +352,7 @@ exports.DataBills = async (req, res) => {
               user: user.id,
               note,
               autos: altAutos.title,
-              amount: levelPack?.pricing ? levelPack.pricing : pack.price,
+              amount: pack.pricing,
               txid,
               tag: withd.id,
               status: "success",
@@ -358,7 +368,7 @@ exports.DataBills = async (req, res) => {
               autos: altAutos.title,
               note: adminnote,
               txid,
-              amount: levelPack?.pricing ? levelPack.pricing : pack.price,
+              amount: pack.pricing,
               tag: withd.id,
               status: "success",
               prevbal: user.prevbalance,
@@ -378,7 +388,7 @@ exports.DataBills = async (req, res) => {
               user: user.id,
               autos: altAutos.title,
               note: failnote,
-              amount: levelPack?.pricing ? levelPack.pricing : pack.price,
+              amount: pack.pricing,
               txid,
               status: "failed",
               prevbal: user.balance,
@@ -392,7 +402,7 @@ exports.DataBills = async (req, res) => {
               user: user.id,
               autos: altAutos.title,
               note: failnote,
-              amount: levelPack?.pricing ? levelPack.pricing : pack.price,
+              amount: pack.pricing,
               txid,
               tag: withd.id,
               status: "failed",
@@ -408,7 +418,7 @@ exports.DataBills = async (req, res) => {
               autos: altAutos.title,
               note: `${failnote} - ${adminnote}`,
               txid,
-              amount: levelPack?.pricing ? levelPack.pricing : pack.price,
+              amount: pack.pricing,
               tag: withd.id,
               status: "failed",
               prevbal: user.balance,
@@ -426,7 +436,7 @@ exports.DataBills = async (req, res) => {
             user: user.id,
             autos: autos.title,
             note: failnote,
-            amount: levelPack?.pricing ? levelPack.pricing : pack.price,
+            amount: pack.pricing,
             txid,
             status: "failed",
             prevbal: user.balance,
@@ -440,7 +450,7 @@ exports.DataBills = async (req, res) => {
             user: user.id,
             autos: autos.title,
             note: failnote,
-            amount: levelPack?.pricing ? levelPack.pricing : pack.price,
+            amount: pack.pricing,
             txid,
             tag: withd.id,
             status: "failed",
@@ -456,7 +466,7 @@ exports.DataBills = async (req, res) => {
             autos: autos.title,
             note: `${failnote} - ${adminnote}`,
             txid,
-            amount: levelPack?.pricing ? levelPack.pricing : pack.price,
+            amount: pack.pricing,
             tag: withd.id,
             status: "failed",
             prevbal: user.balance,
@@ -486,8 +496,6 @@ exports.AirtimeBill = async (req, res) => {
 
     // check if subscription exists
     const service = await Subscription.findOne({ where: { id: sub } });
-
-
     if (!service)
       return res.json({ status: 400, msg: `Subscription not found` });
 
@@ -645,7 +653,7 @@ exports.AirtimeBill = async (req, res) => {
       //     }
       //   }
       // }
-      
+
 
       // if all is good move forward else move to the second api service
       if (
@@ -655,10 +663,10 @@ exports.AirtimeBill = async (req, res) => {
         result.data.Status === "successful" ||
         result.data.status === true
       ) {
-        
+
         //write code to track kyc limit
         await Kyctrack.create({ user: user.id, amount: dataAmount, date: moment().format('DD-MM-YYYY') })
-        
+
         //deduct from user balance
         user.prevbalance = user.balance;
         user.balance = eval(`${user.balance} - ${dataAmount}`);
