@@ -16,6 +16,7 @@ const jwt = require('jsonwebtoken')
 const otpGenerator = require('otp-generator')
 const { ServerError, ServerCurrency } = require('../config/utils')
 const fs = require('fs')
+const level = require('../models/level')
 
 const exclusions = ['password', 'apitoken', 'datapin', 'pin', 'pass', 'refid', 'prevbalance', 'balance', 'block', 'resetcode', 'upline', 'updatedAt']
 
@@ -59,15 +60,17 @@ exports.UserSignup = async (req, res) => {
         const newuser = { firstname, upline: upline, refid: refData, role: `user`, lastname, email, phone, username, resetcode: otp, pass: password, password: newpswd, verified: 'false', status: 'offline' }
         const userData = await User.create(newuser)
 
-        // now check if there is no level then create on and tag the user to it, else just tag user to the level
-        const findLevel = await Level.findAndCountAll({})
-        if (findLevel.count === 0) {
-            const levelFile = { title: 'Level 1' }
-            const lev = await Level.create(levelFile)
 
-            userData.level = lev.id
+
+        const findlev = await Level.findOne({ where: { leveltype: 'yes' } })
+        if (findlev) {
+            userData.level = findlev.id
             await userData.save()
         }
+
+
+
+
         return res.json({ status: 200, msg: email })
 
     } catch (error) {
@@ -176,8 +179,8 @@ exports.FetchuserAccount = async (req, res) => {
         const levels = await Level.findAll({})
         return res.json({ status: 200, msg: user, levels });
     } catch (error) {
-        ServerError(res, error)
-    }
+        ServerError(res, error)
+    }
 }
 
 exports.UserLogout = async (req, res) => {
@@ -283,7 +286,7 @@ exports.AdminFetchAllUsersEmails = async (req, res) => {
 exports.AdminFetchAllUsers = async (req, res) => {
     try {
         const users = await User.findAll({
-            attributes: {exclude: exclusions}
+            attributes: { exclude: exclusions }
         })
         const levels = await Level.findAll({})
         const mapped = []
@@ -455,9 +458,9 @@ exports.KycUpload = async (req, res) => {
             if (!kycnote) return res.json({ status: 404, msg: `provide your complete detail` })
         }
         const user = await User.findByPk(req.user)
-        if(user.verified === 'verified') return res.json({status: 200, msg: `You are already verified`})
-        if(user.verified === 'declined') return res.json({status: 400, msg: `Your request was declined, cannot submit document at the moment`})
-        if(user.kyc !== null) return res.json({status: 400, msg: `You have already submitted your kyc document `})
+        if (user.verified === 'verified') return res.json({ status: 200, msg: `You are already verified` })
+        if (user.verified === 'declined') return res.json({ status: 400, msg: `Your request was declined, cannot submit document at the moment` })
+        if (user.kyc !== null) return res.json({ status: 400, msg: `You have already submitted your kyc document ` })
         const idfront = !req?.files?.idfront ? null : req.files.idfront
         const idback = !req?.files?.idback ? null : req.files.idback
         const date = new Date()
@@ -528,7 +531,7 @@ exports.DeleteKycDocument = async (req, res) => {
         const user = await User.findByPk(userid)
         if (!user) return res.json({ status: 404, msg: `User not found` })
 
-        if(user.verified !== 'declined') return res.json({status: 400, msg: `An Action has already been carried out on this verification.`})
+        if (user.verified !== 'declined') return res.json({ status: 400, msg: `An Action has already been carried out on this verification.` })
         const frontPath = `./public/documents/${user.idfront}`
         const backPath = `./public/documents/${user.idback}`
         if (fs.existsSync(frontPath)) {
@@ -538,7 +541,7 @@ exports.DeleteKycDocument = async (req, res) => {
             fs.unlinkSync(backPath)
         }
         user.verified = true
-        user.idfront = null 
+        user.idfront = null
         user.idback = null
         user.note = null
         user.kyc = null
@@ -599,7 +602,7 @@ exports.AdminDashboard = async (req, res) => {
             }
         })
         const baled = balArr.toLocaleString()
-        
+
         const details = [
             { title: 'total users', val: users.length.toLocaleString() },
             { title: 'total deposits', val: depts.length.toLocaleString() },

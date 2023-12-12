@@ -813,7 +813,7 @@ exports.AdminGetSingleApiPlan = async (req, res) => {
 
 exports.CreateLevel = async (req, res) => {
   try {
-    const { title, packs, subs, users } = req.body;
+    const { title, packs, subs } = req.body;
     // check if level already exists
     const findLev = await Level.findOne({ where: { title: title } });
     if (findLev)
@@ -843,14 +843,6 @@ exports.CreateLevel = async (req, res) => {
       });
     }
 
-    // workout for users
-    users.map(async (ele) => {
-      const item = await User.findByPk(ele.id);
-      if (item) {
-        item.level = newLevel.id;
-        await item.save();
-      }
-    });
 
     return res.json({ status: 200, msg: `Level Successfully Created!...` });
   } catch (error) {
@@ -860,7 +852,7 @@ exports.CreateLevel = async (req, res) => {
 
 exports.UpdateLevel = async (req, res) => {
   try {
-    const { title, packs, subs, users, id } = req.body;
+    const { title, packs, subs, id } = req.body;
     // check if level already exists
     const findLev = await Level.findOne({ where: { id: id } });
     if (!findLev)
@@ -907,13 +899,7 @@ exports.UpdateLevel = async (req, res) => {
     }
 
     // workout for users
-    users.map(async (ele) => {
-      const item = await User.findByPk(ele.id);
-      if (item) {
-        item.level = findLev.id;
-        await item.save();
-      }
-    });
+  
 
     return res.json({ status: 200, msg: `Level Successfully Updated!...` });
   } catch (error) {

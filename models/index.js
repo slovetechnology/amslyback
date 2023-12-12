@@ -107,4 +107,4 @@ db.levelsubs.belongsTo(db.subscriptions, {foreignKey: 'sub', as: 'subs'})
 db.levelpackages.belongsTo(db.subscriptiondata, {foreignKey: 'pack', as: 'packs'})
 
 
-module.exports = db
+module.exports = db

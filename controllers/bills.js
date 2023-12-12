@@ -487,6 +487,7 @@ exports.AirtimeBill = async (req, res) => {
     // check if subscription exists
     const service = await Subscription.findOne({ where: { id: sub } });
 
+
     if (!service)
       return res.json({ status: 400, msg: `Subscription not found` });
 
@@ -496,6 +497,7 @@ exports.AirtimeBill = async (req, res) => {
     if (!pack) return res.json({ status: 400, msg: `Package Not Found` });
 
     const level = await Level.findOne({ where: { id: user.level } })
+
     const levelPack = await Levelpack.findOne({ where: { level: level.id, pack: pack.id } })
 
     // check if transaction pin matches
@@ -531,6 +533,8 @@ exports.AirtimeBill = async (req, res) => {
     const altAutos = await Automation.findOne({
       where: { id: pack.altAutomation },
     });
+    // return res.json({ status: 400, msg: pack, news: 'good' })
+
 
     if (altAutos) {
       altAutosParent = await Automation.findOne({
@@ -543,7 +547,6 @@ exports.AirtimeBill = async (req, res) => {
       const endpoint = await Endpoint.findOne({
         where: { category: "airtime", automation: autosParent.id },
       });
-
       const url = `${autosParent.apiurl}${endpoint.title}`;
       const postFormdata = {
         [autosParent.tokenName]: autosParent.token,
@@ -618,12 +621,21 @@ exports.AirtimeBill = async (req, res) => {
       //upline recieves the bonus
       //downline gives out the bonus
 
-      // const userupline = await User.findOne({ where: { refid: user.upline } })
-      // const findreftrack = await Reftrack.findOne({ where: { downline: user.id, upline: userupline.id} })
+      const userupline = await User.findOne({ where: { refid: user.upline } })
+      if (userupline) {
+        const findreftrack = await Reftrack.findOne({ where: { downline: user.id, upline: userupline.id } })
 
-      // if (findreftrack) {
-      //   findreftrack.amount += parseInt(dataAmount)
-      //   await findreftrack.save()
+        if (findreftrack) {
+          findreftrack.amount += parseInt(dataAmount)
+          await findreftrack.save()
+        }
+        if (findreftrack) {
+          if (findreftrack.amount >= 10) {
+            userupline.bonus += parseInt(10)
+          }
+        }
+      }
+
 
       // }
       // if (userupline) {
