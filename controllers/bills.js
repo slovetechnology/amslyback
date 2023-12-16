@@ -41,8 +41,8 @@ exports.DataBills = async (req, res) => {
     // check if subscription exists
     // const sub = await Subscription.findOne({ where: { id: network } });
     const getLevelSub = await LevelSub.findOne({
-      where: {sub: network},
-      include: [{model: Subscription, as: 'subs'}]
+      where: { sub: network },
+      include: [{ model: Subscription, as: 'subs' }]
     })
     if (!getLevelSub) return res.json({ status: 400, msg: `Subscription not found` });
     const sub = getLevelSub.subs
@@ -50,8 +50,8 @@ exports.DataBills = async (req, res) => {
     // check is package exists
     // const pack = await Subscriptiondata.findOne({ where: { id: package } });
     const getLevelPackage = await Levelpack.findOne({
-      where: {id: package},
-      include: [{model: Subscriptiondata, as: 'packs'}]
+      where: { id: package },
+      include: [{ model: Subscriptiondata, as: 'packs' }]
     })
     if (!getLevelPackage) return res.json({ status: 400, msg: `Package Not Found` });
     const pack = getLevelPackage
@@ -495,18 +495,25 @@ exports.AirtimeBill = async (req, res) => {
     if (!user) return res.json({ status: 400, msg: `User Not Found` });
 
     // check if subscription exists
-    const service = await Subscription.findOne({ where: { id: sub } });
-    if (!service)
-      return res.json({ status: 400, msg: `Subscription not found` });
+    // const service = await LevelSub.findOne({ where: { id: sub } });
+    const levelService = await LevelSub.findOne({
+      where: { id: sub },
+      include: [{ 
+        model: Subscription, 
+        as: 'subs',
+        include: [{model: Subscriptiondata, as: 'sub'}]
+      }]
+    })
+    
 
+    if (!levelService)
+      return res.json({ status: 400, msg: `Subscription not found` });
+    const service = levelService.sub
     // check is package exists
 
-    const pack = await Subscriptiondata.findOne({ where: { id: network } });
+    const pack = levelService.subs.sub[0]
+
     if (!pack) return res.json({ status: 400, msg: `Package Not Found` });
-
-    const level = await Level.findOne({ where: { id: user.level } })
-
-    const levelPack = await Levelpack.findOne({ where: { level: level.id, pack: pack.id } })
 
     // check if transaction pin matches
     if (pin !== user.datapin)
