@@ -498,13 +498,13 @@ exports.AirtimeBill = async (req, res) => {
     // const service = await LevelSub.findOne({ where: { id: sub } });
     const levelService = await LevelSub.findOne({
       where: { id: sub },
-      include: [{ 
-        model: Subscription, 
+      include: [{
+        model: Subscription,
         as: 'subs',
-        include: [{model: Subscriptiondata, as: 'sub'}]
+        include: [{ model: Subscriptiondata, as: 'sub' }]
       }]
     })
-    
+
 
     if (!levelService)
       return res.json({ status: 400, msg: `Subscription not found` });
@@ -978,13 +978,24 @@ exports.CableBill = async (req, res) => {
     if (!user) return res.json({ status: 400, msg: `User Not Found` });
 
     // check if subscription exists
-    const service = await Subscription.findOne({ where: { id: sub } });
-    if (!service)
+    // const service = await Subscription.findOne({ where: { id: sub } });
+    const levelService = await LevelSub.findOne({
+      where: { sub: sub },
+      include: [{ model: Subscription, as: 'subs' }]
+    })
+    // return res.json({status: 400, msg: levelService, gig: 'goog'})
+    if (!levelService)
       return res.json({ status: 400, msg: `Subscription not found` });
+    const service = levelService.subs
 
     // check is package exists
-    const pack = await Subscriptiondata.findOne({ where: { id: plan } });
-    if (!pack) return res.json({ status: 400, msg: `Package Not Found` });
+    // const pack = await Subscriptiondata.findOne({ where: { id: plan } });
+    const levelpackages = await Levelpack.findOne({
+      where: { id: plan },
+      include: [{ model: Subscriptiondata, as: 'packs' }]
+    })
+    if (!levelpackages) return res.json({ status: 400, msg: `Package Not Found` });
+    const pack = levelpackages.packs
 
     const level = await Level.findOne({ where: { id: user.level } })
     const levelPack = await Levelpack.findOne({ where: { level: level.id, pack: plan } })
@@ -1386,13 +1397,26 @@ exports.VerifyIUCNumber = async (req, res) => {
     if (pin !== user.datapin)
       return res.json({ status: 400, msg: `Wrong Transaction Pin Detected` });
 
-    const sub = await Subscription.findOne({ where: { id: service } });
-    if (!sub) return res.json({ status: 404, msg: `Subscription Not found` });
+    // const sub = await Subscription.findOne({where: { id: service }});
+    const levelsubs = await LevelSub.findOne({
+      where: { sub: service },
+      include: [{ model: Subscription, as: 'subs' }]
+    })
 
-    const subdata = await Subscriptiondata.findOne({ where: { id: pack } });
-    if (!subdata) return res.json({ status: 404, msg: `Package not found` });
+    if (!levelsubs) return res.json({ status: 404, msg: `Subscription Not found` });
+    const sub = levelsubs.subs
+
+    // const subdata = await Levelpack.findOne({where: { id: pack }});
+    const levelpackages = await Levelpack.findOne({
+      where: { id: pack },
+      include: [{ model: Subscriptiondata, as: 'packs' }]
+    })
+
+    if (!levelpackages) return res.json({ status: 404, msg: `Package not found` });
+    const subdata = levelpackages.packs
 
     const autos = await Cable.findOne({ where: { id: subdata.automation } });
+    
     if (!autos)
       return res.json({
         status: 400,
