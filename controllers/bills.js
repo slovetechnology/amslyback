@@ -1606,7 +1606,7 @@ exports.ElectricityBill = async (req, res) => {
       where: { sub: sub },
       include: [{ model: Subscription, as: 'subs' }]
     })
-    return res.json({ status: 400, msg: levelService })
+
     if (!levelService)
       return res.json({ status: 400, msg: `Subscription not found` });
     const service = levelService.subs
@@ -2252,13 +2252,21 @@ exports.ExamBill = async (req, res) => {
 
     // check if subscription exists
     // const service = await Subscription.findOne({ where: { id: sub } });
-    // if (!service)
-    //   return res.json({ status: 400, msg: `Subscription not found` });
+    const levelsubs = LevelSub.findOne({ where: { sub: sub },
+      include: [{model: Subscription, as: "subs"}] 
+    })
+    if (!levelsubs)
+      return res.json({ status: 400, msg: `Subscription not found` });
+      const service = levelsubs.subs
 
     // check is package exists
-    const pack = await Subscriptiondata.findOne({ where: { id: sub } });
-    if (!pack) return res.json({ status: 400, msg: `Package Not Found` });
-
+    // const pack = await Subscriptiondata.findOne({ where: { id: sub } });
+    const levelpackages = await Levelpack.findOne({
+      where: { id: sub },
+      include: [{ model: Subscriptiondata, as: "packs" }]
+    })
+    if (!levelpackages) return res.json({ status: 400, msg: `Package Not Found` });
+    const pack = levelpackages.packs
     const level = await Level.findOne({ where: { id: user.level } })
     const levelPack = await Levelpack.findOne({ where: { level: level.id, pack: pack.id } })
 
@@ -2267,7 +2275,7 @@ exports.ExamBill = async (req, res) => {
       return res.json({ status: 400, msg: `Invalid Transaction Pin detected` });
 
     // check if user has enough balance
-    if (user.balance < pack.price)
+    if (user.balance < pack.pricing)
       return res.json({ status: 400, msg: `Insufficient Balance` });
 
     // check if there is an automation service connected to the package
@@ -2355,7 +2363,7 @@ exports.ExamBill = async (req, res) => {
       ) {
         //deduct from user balance
         user.prevbalance = user.balance;
-        user.balance = eval(`${user.balance} - ${levelPack?.pricing ? levelPack.pricing : pack.price}`);
+        user.balance = eval(`${user.balance} - ${levelPack?.pricing ? levelPack.pricing : pack.pricing}`);
 
 
         await user.save();
@@ -2363,7 +2371,7 @@ exports.ExamBill = async (req, res) => {
           user: user.id,
           autos: autosParent.title,
           note,
-          amount: levelPack?.pricing ? levelPack.pricing : pack.price,
+          amount: levelPack?.pricing ? levelPack.pricing : pack.pricing,
           txid,
           status: "success",
           prevbal: user.prevbalance,
@@ -2376,7 +2384,7 @@ exports.ExamBill = async (req, res) => {
           user: user.id,
           autos: autosParent.title,
           note,
-          amount: levelPack?.pricing ? levelPack.pricing : pack.price,
+          amount: levelPack?.pricing ? levelPack.pricing : pack.pricing,
           txid,
           tag: withd.id,
           status: "success",
@@ -2391,7 +2399,7 @@ exports.ExamBill = async (req, res) => {
           autos: autosParent.title,
           note: adminnote,
           txid,
-          amount: levelPack?.pricing ? levelPack.pricing : pack.price,
+          amount: levelPack?.pricing ? levelPack.pricing : pack.pricing,
           tag: withd.id,
           status: "success",
           prevbal: user.prevbalance,
@@ -2496,7 +2504,7 @@ exports.ExamBill = async (req, res) => {
               user: user.id,
               autos: altAutosParent.title,
               note,
-              amount: levelPack?.pricing ? levelPack.pricing : pack.price,
+              amount: levelPack?.pricing ? levelPack.pricing : pack.pricing,
               txid,
               status: "success",
               prevbal: user.prevbalance,
@@ -2509,7 +2517,7 @@ exports.ExamBill = async (req, res) => {
               user: user.id,
               note,
               autos: altAutosParent.title,
-              amount: levelPack?.pricing ? levelPack.pricing : pack.price,
+              amount: levelPack?.pricing ? levelPack.pricing : pack.pricing,
               txid,
               tag: withd.id,
               status: "success",
@@ -2524,7 +2532,7 @@ exports.ExamBill = async (req, res) => {
               autos: altAutosParent.title,
               note: adminnote,
               txid,
-              amount: levelPack?.pricing ? levelPack.pricing : pack.price,
+              amount: levelPack?.pricing ? levelPack.pricing : pack.pricing,
               tag: withd.id,
               status: "success",
               prevbal: user.prevbalance,
@@ -2543,7 +2551,7 @@ exports.ExamBill = async (req, res) => {
               user: user.id,
               autos: altAutosParent.title,
               note: failnote,
-              amount: levelPack?.pricing ? levelPack.pricing : pack.price,
+              amount: levelPack?.pricing ? levelPack.pricing : pack.pricing,
               txid,
               status: "failed",
               prevbal: user.balance,
@@ -2556,7 +2564,7 @@ exports.ExamBill = async (req, res) => {
               user: user.id,
               autos: altAutosParent.title,
               note: failnote,
-              amount: levelPack?.pricing ? levelPack.pricing : pack.price,
+              amount: levelPack?.pricing ? levelPack.pricing : pack.pricing,
               txid,
               tag: withd.id,
               status: "failed",
@@ -2571,7 +2579,7 @@ exports.ExamBill = async (req, res) => {
               autos: altAutosParent.title,
               note: `${failnote} - ${adminnote}`,
               txid,
-              amount: levelPack?.pricing ? levelPack.pricing : pack.price,
+              amount: levelPack?.pricing ? levelPack.pricing : pack.pricing,
               tag: withd.id,
               status: "failed",
               prevbal: user.balance,
@@ -2588,7 +2596,7 @@ exports.ExamBill = async (req, res) => {
             user: user.id,
             autos: autosParent.title,
             note: failnote,
-            amount: levelPack?.pricing ? levelPack.pricing : pack.price,
+            amount: levelPack?.pricing ? levelPack.pricing : pack.pricing,
             txid,
             status: "failed",
             prevbal: user.balance,
@@ -2601,7 +2609,7 @@ exports.ExamBill = async (req, res) => {
             user: user.id,
             autos: autosParent.title,
             note: failnote,
-            amount: levelPack?.pricing ? levelPack.pricing : pack.price,
+            amount: levelPack?.pricing ? levelPack.pricing : pack.pricing,
             txid,
             tag: withd.id,
             status: "failed",
@@ -2616,7 +2624,7 @@ exports.ExamBill = async (req, res) => {
             autos: autosParent.title,
             note: `${failnote} - ${adminnote}`,
             txid,
-            amount: levelPack?.pricing ? levelPack.pricing : pack.price,
+            amount: levelPack?.pricing ? levelPack.pricing : pack.pricing,
             tag: withd.id,
             status: "failed",
             prevbal: user.balance,
