@@ -1005,7 +1005,7 @@ exports.CableBill = async (req, res) => {
       return res.json({ status: 400, msg: `Invalid Transaction Pin detected` });
 
     // check if user has enough balance
-    if (user.balance < pack.price)
+    if (user.balance < pack.pricing)
       return res.json({ status: 400, msg: `Insufficient Balance` });
 
     // fetch APiPlan
@@ -1095,7 +1095,7 @@ exports.CableBill = async (req, res) => {
       ) {
         //deduct from user balance
         user.prevbalance = user.balance;
-        user.balance = eval(`${user.balance} - ${levelPack?.pricing ? levelPack.pricing : pack.price}`);
+        user.balance = eval(`${user.balance} - ${levelPack?.pricing ? levelPack.pricing : pack.pricing}`);
 
 
         await user.save();
@@ -1103,7 +1103,7 @@ exports.CableBill = async (req, res) => {
           user: user.id,
           autos: autosParent.title,
           note,
-          amount: levelPack?.pricing ? levelPack.pricing : pack.price,
+          amount: levelPack?.pricing ? levelPack.pricing : pack.pricing,
           txid,
           status: "success",
           prevbal: user.prevbalance,
@@ -1117,7 +1117,7 @@ exports.CableBill = async (req, res) => {
           user: user.id,
           autos: autosParent.title,
           note,
-          amount: levelPack?.pricing ? levelPack.pricing : pack.price,
+          amount: levelPack?.pricing ? levelPack.pricing : pack.pricing,
           txid,
           tag: withd.id,
           status: "success",
@@ -1133,7 +1133,7 @@ exports.CableBill = async (req, res) => {
           autos: autosParent.title,
           note: adminnote,
           txid,
-          amount: levelPack?.pricing ? levelPack.pricing : pack.price,
+          amount: levelPack?.pricing ? levelPack.pricing : pack.pricing,
           tag: withd.id,
           status: "success",
           prevbal: user.prevbalance,
@@ -1230,14 +1230,14 @@ exports.CableBill = async (req, res) => {
           ) {
             //deduct from user balance
             user.prevbalance = user.balance;
-            user.balance = eval(`${user.balance} - ${levelPack?.pricing ? levelPack.pricing : pack.price}`);
+            user.balance = eval(`${user.balance} - ${levelPack?.pricing ? levelPack.pricing : pack.pricing}`);
 
             await user.save();
             const newWithData = {
               user: user.id,
               autos: altAutosParent.title,
               note,
-              amount: levelPack?.pricing ? levelPack.pricing : pack.price,
+              amount: levelPack?.pricing ? levelPack.pricing : pack.pricing,
               txid,
               status: "success",
               prevbal: user.prevbalance,
@@ -1251,7 +1251,7 @@ exports.CableBill = async (req, res) => {
               user: user.id,
               note,
               autos: altAutosParent.title,
-              amount: levelPack?.pricing ? levelPack.pricing : pack.price,
+              amount: levelPack?.pricing ? levelPack.pricing : pack.pricing,
               txid,
               tag: withd.id,
               status: "success",
@@ -1267,7 +1267,7 @@ exports.CableBill = async (req, res) => {
               autos: altAutosParent.title,
               note: adminnote,
               txid,
-              amount: levelPack?.pricing ? levelPack.pricing : pack.price,
+              amount: levelPack?.pricing ? levelPack.pricing : pack.pricing,
               tag: withd.id,
               status: "success",
               prevbal: user.prevbalance,
@@ -1287,7 +1287,7 @@ exports.CableBill = async (req, res) => {
               user: user.id,
               autos: altAutosParent.title,
               note: failnote,
-              amount: levelPack?.pricing ? levelPack.pricing : pack.price,
+              amount: levelPack?.pricing ? levelPack.pricing : pack.pricing,
               txid,
               status: "failed",
               prevbal: user.balance,
@@ -1301,7 +1301,7 @@ exports.CableBill = async (req, res) => {
               user: user.id,
               autos: altAutosParent.title,
               note: failnote,
-              amount: levelPack?.pricing ? levelPack.pricing : pack.price,
+              amount: levelPack?.pricing ? levelPack.pricing : pack.pricing,
               txid,
               tag: withd.id,
               status: "failed",
@@ -1317,7 +1317,7 @@ exports.CableBill = async (req, res) => {
               autos: altAutosParent.title,
               note: `${failnote} - [${result?.data?.desc}]`,
               txid,
-              amount: levelPack?.pricing ? levelPack.pricing : pack.price,
+              amount: levelPack?.pricing ? levelPack.pricing : pack.pricing,
               tag: withd.id,
               status: "failed",
               prevbal: user.balance,
@@ -1335,7 +1335,7 @@ exports.CableBill = async (req, res) => {
             user: user.id,
             autos: autosParent.title,
             note: failnote,
-            amount: levelPack?.pricing ? levelPack.pricing : pack.price,
+            amount: levelPack?.pricing ? levelPack.pricing : pack.pricing,
             txid,
             status: "failed",
             prevbal: user.balance,
@@ -1349,7 +1349,7 @@ exports.CableBill = async (req, res) => {
             user: user.id,
             autos: autosParent.title,
             note: failnote,
-            amount: levelPack?.pricing ? levelPack.pricing : pack.price,
+            amount: levelPack?.pricing ? levelPack.pricing : pack.pricing,
             txid,
             tag: withd.id,
             status: "failed",
@@ -1365,7 +1365,7 @@ exports.CableBill = async (req, res) => {
             autos: autosParent.title,
             note: `${failnote} - [${result?.data?.desc}]`,
             txid,
-            amount: levelPack?.pricing ? levelPack.pricing : pack.price,
+            amount: levelPack?.pricing ? levelPack.pricing : pack.pricing,
             tag: withd.id,
             status: "failed",
             prevbal: user.balance,
@@ -1416,7 +1416,7 @@ exports.VerifyIUCNumber = async (req, res) => {
     const subdata = levelpackages.packs
 
     const autos = await Cable.findOne({ where: { id: subdata.automation } });
-    
+
     if (!autos)
       return res.json({
         status: 400,
@@ -1599,17 +1599,26 @@ exports.ElectricityBill = async (req, res) => {
     const user = await User.findByPk(req.user);
     if (!user) return res.json({ status: 400, msg: `User Not Found` });
     const newAmount = parseFloat(amount)
+
     // check if subscription exists
-    const service = await Subscription.findOne({ where: { id: sub } });
-    if (!service)
+    // const service = await Subscription.findOne({ where: { id: sub } });
+    const levelService = await LevelSub.findOne({
+      where: { sub: sub },
+      include: [{ model: Subscription, as: 'subs' }]
+    })
+    return res.json({ status: 400, msg: levelService })
+    if (!levelService)
       return res.json({ status: 400, msg: `Subscription not found` });
+    const service = levelService.subs
 
     // check is package exists
-    const pack = await Subscriptiondata.findOne({ where: { id: serviceType } });
-    if (!pack) return res.json({ status: 400, msg: `Package Not Found` });
-
-    const level = await Level.findOne({ where: { id: user.level } })
-    const levelPack = await Levelpack.findOne({ where: { level: level.id, pack: pack.id } })
+    // const pack = await Subscriptiondata.findOne({ where: { id: serviceType } });
+    const levelpack = await Levelpack.findOne({
+      where: { id: serviceType },
+      include: [{ model: Subscriptiondata, as: 'packs' }]
+    })
+    if (!levelPack) return res.json({ status: 400, msg: 'Package NotFound' });
+    const pack = levelpack.packs
 
     // check if transaction pin matches
     if (pin !== user.datapin)
@@ -2036,13 +2045,23 @@ exports.VerifyMeterNumber = async (req, res) => {
     if (pin !== user.datapin)
       return res.json({ status: 400, msg: `Wrong Transaction Pin Detected` });
 
-    const sub = await Subscription.findOne({ where: { id: service } });
-    if (!sub) return res.json({ status: 404, msg: `Subscription Not found` });
+    // const sub = await Subscription.findOne({ where: { id: service } });
+    const levelService = await LevelSub.findOne({
+      where: { sub: service },
+      include: [{ model: Subscription, as: 'subs' }]
+    })
 
-    const subdata = await Subscriptiondata.findOne({
+    if (!levelService) return res.json({ status: 404, msg: `Subscription Not found` });
+    const sub = levelService.subs
+
+    // const subdata = await Subscriptiondata.findOne({where: { id: serviceType } });
+    const levelpack = await Levelpack.findOne({
       where: { id: serviceType },
-    });
-    if (!subdata) return res.json({ status: 404, msg: `Package not found` });
+      include: [{ model: Subscriptiondata, as: 'packs' }]
+    })
+    if (!levelpack) return res.json({ status: 404, msg: `Package not found` });
+    const subdata = levelpack.packs
+
     const autos = await Elec.findOne({ where: { id: subdata.automation } });
     if (!autos)
       return res.json({
