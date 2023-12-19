@@ -1005,7 +1005,7 @@ exports.CableBill = async (req, res) => {
       return res.json({ status: 400, msg: `Invalid Transaction Pin detected` });
 
     // check if user has enough balance
-    if (user.balance < pack.price)
+    if (user.balance < pack.pricing)
       return res.json({ status: 400, msg: `Insufficient Balance` });
 
     // fetch APiPlan
@@ -1095,7 +1095,7 @@ exports.CableBill = async (req, res) => {
       ) {
         //deduct from user balance
         user.prevbalance = user.balance;
-        user.balance = eval(`${user.balance} - ${levelPack?.pricing ? levelPack.pricing : pack.price}`);
+        user.balance = eval(`${user.balance} - ${levelPack?.pricing ? levelPack.pricing : pack.pricing}`);
 
 
         await user.save();
@@ -1103,7 +1103,7 @@ exports.CableBill = async (req, res) => {
           user: user.id,
           autos: autosParent.title,
           note,
-          amount: levelPack?.pricing ? levelPack.pricing : pack.price,
+          amount: levelPack?.pricing ? levelPack.pricing : pack.pricing,
           txid,
           status: "success",
           prevbal: user.prevbalance,
@@ -1117,7 +1117,7 @@ exports.CableBill = async (req, res) => {
           user: user.id,
           autos: autosParent.title,
           note,
-          amount: levelPack?.pricing ? levelPack.pricing : pack.price,
+          amount: levelPack?.pricing ? levelPack.pricing : pack.pricing,
           txid,
           tag: withd.id,
           status: "success",
@@ -1133,7 +1133,7 @@ exports.CableBill = async (req, res) => {
           autos: autosParent.title,
           note: adminnote,
           txid,
-          amount: levelPack?.pricing ? levelPack.pricing : pack.price,
+          amount: levelPack?.pricing ? levelPack.pricing : pack.pricing,
           tag: withd.id,
           status: "success",
           prevbal: user.prevbalance,
@@ -1230,14 +1230,14 @@ exports.CableBill = async (req, res) => {
           ) {
             //deduct from user balance
             user.prevbalance = user.balance;
-            user.balance = eval(`${user.balance} - ${levelPack?.pricing ? levelPack.pricing : pack.price}`);
+            user.balance = eval(`${user.balance} - ${levelPack?.pricing ? levelPack.pricing : pack.pricing}`);
 
             await user.save();
             const newWithData = {
               user: user.id,
               autos: altAutosParent.title,
               note,
-              amount: levelPack?.pricing ? levelPack.pricing : pack.price,
+              amount: levelPack?.pricing ? levelPack.pricing : pack.pricing,
               txid,
               status: "success",
               prevbal: user.prevbalance,
@@ -1251,7 +1251,7 @@ exports.CableBill = async (req, res) => {
               user: user.id,
               note,
               autos: altAutosParent.title,
-              amount: levelPack?.pricing ? levelPack.pricing : pack.price,
+              amount: levelPack?.pricing ? levelPack.pricing : pack.pricing,
               txid,
               tag: withd.id,
               status: "success",
@@ -1267,7 +1267,7 @@ exports.CableBill = async (req, res) => {
               autos: altAutosParent.title,
               note: adminnote,
               txid,
-              amount: levelPack?.pricing ? levelPack.pricing : pack.price,
+              amount: levelPack?.pricing ? levelPack.pricing : pack.pricing,
               tag: withd.id,
               status: "success",
               prevbal: user.prevbalance,
@@ -1287,7 +1287,7 @@ exports.CableBill = async (req, res) => {
               user: user.id,
               autos: altAutosParent.title,
               note: failnote,
-              amount: levelPack?.pricing ? levelPack.pricing : pack.price,
+              amount: levelPack?.pricing ? levelPack.pricing : pack.pricing,
               txid,
               status: "failed",
               prevbal: user.balance,
@@ -1301,7 +1301,7 @@ exports.CableBill = async (req, res) => {
               user: user.id,
               autos: altAutosParent.title,
               note: failnote,
-              amount: levelPack?.pricing ? levelPack.pricing : pack.price,
+              amount: levelPack?.pricing ? levelPack.pricing : pack.pricing,
               txid,
               tag: withd.id,
               status: "failed",
@@ -1317,7 +1317,7 @@ exports.CableBill = async (req, res) => {
               autos: altAutosParent.title,
               note: `${failnote} - [${result?.data?.desc}]`,
               txid,
-              amount: levelPack?.pricing ? levelPack.pricing : pack.price,
+              amount: levelPack?.pricing ? levelPack.pricing : pack.pricing,
               tag: withd.id,
               status: "failed",
               prevbal: user.balance,
@@ -1335,7 +1335,7 @@ exports.CableBill = async (req, res) => {
             user: user.id,
             autos: autosParent.title,
             note: failnote,
-            amount: levelPack?.pricing ? levelPack.pricing : pack.price,
+            amount: levelPack?.pricing ? levelPack.pricing : pack.pricing,
             txid,
             status: "failed",
             prevbal: user.balance,
@@ -1349,7 +1349,7 @@ exports.CableBill = async (req, res) => {
             user: user.id,
             autos: autosParent.title,
             note: failnote,
-            amount: levelPack?.pricing ? levelPack.pricing : pack.price,
+            amount: levelPack?.pricing ? levelPack.pricing : pack.pricing,
             txid,
             tag: withd.id,
             status: "failed",
@@ -1365,7 +1365,7 @@ exports.CableBill = async (req, res) => {
             autos: autosParent.title,
             note: `${failnote} - [${result?.data?.desc}]`,
             txid,
-            amount: levelPack?.pricing ? levelPack.pricing : pack.price,
+            amount: levelPack?.pricing ? levelPack.pricing : pack.pricing,
             tag: withd.id,
             status: "failed",
             prevbal: user.balance,
